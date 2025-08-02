@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      adventures: {
+        Row: {
+          content: Json
+          created_at: string
+          description: string | null
+          game_system: string | null
+          id: string
+          image_urls: string[] | null
+          is_public: boolean | null
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          description?: string | null
+          game_system?: string | null
+          id?: string
+          image_urls?: string[] | null
+          is_public?: boolean | null
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          description?: string | null
+          game_system?: string | null
+          id?: string
+          image_urls?: string[] | null
+          is_public?: boolean | null
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          credits_remaining: number | null
+          display_name: string | null
+          email: string
+          id: string
+          monthly_generations: number | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          credits_remaining?: number | null
+          display_name?: string | null
+          email: string
+          id?: string
+          monthly_generations?: number | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          credits_remaining?: number | null
+          display_name?: string | null
+          email?: string
+          id?: string
+          monthly_generations?: number | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
