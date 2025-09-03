@@ -76,8 +76,7 @@ npm run dev:full
 Ensure your `.env` file contains:
 ```env
 # Database
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+DATABASE_URL=postgresql://username:password@localhost:5432/arcanum_scribe
 
 # OpenRouter
 OPENROUTER_API_KEY=sk-or-your-key-here

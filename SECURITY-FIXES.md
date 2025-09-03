@@ -2,15 +2,15 @@
 
 ## Critical Security Vulnerabilities Resolved
 
-This document outlines the security fixes applied to address exposed credentials and sensitive data in the repository.
+This document outlines the security fixes applied to address exposed credentials and sensitive data in the repository, including the removal of obsolete Supabase references from a PostgreSQL-only project.
 
 ### 🚨 Issues Fixed
 
-#### 1. **Supabase Service Role Key Exposure** (CRITICAL)
-- **File**: `scripts/seed-env.ts`
-- **Issue**: Hardcoded Supabase service role JWT token
-- **Fix**: Replaced with environment variable `SUPABASE_SERVICE_ROLE_KEY`
-- **Impact**: Prevents unauthorized access to Supabase database
+#### 1. **Obsolete Supabase References** (CLEANUP)
+- **Files**: Multiple scripts and configuration files
+- **Issue**: References to Supabase in a PostgreSQL-only project
+- **Fix**: Removed all Supabase-related files and references
+- **Impact**: Cleaned up obsolete dependencies and configurations
 
 #### 2. **PostgreSQL Credentials Exposure** (CRITICAL)
 - **File**: `config/env-template.txt`
@@ -45,8 +45,7 @@ This document outlines the security fixes applied to address exposed credentials
 All sensitive data now uses environment variables:
 ```bash
 # Required environment variables
-SUPABASE_URL=your-supabase-url
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+DATABASE_URL=postgresql://username:password@localhost:5432/arcanum_scribe
 TEST_AUTH_TOKEN=your-test-token
 TEST_ADMIN_EMAIL=admin@example.com
 TEST_ADMIN_PASSWORD=your-secure-password
@@ -72,7 +71,6 @@ Configure these secrets in your GitHub repository settings:
 - `TEST_AUTH_TOKEN`
 - `TEST_ADMIN_EMAIL`
 - `TEST_ADMIN_PASSWORD`
-- `SUPABASE_SERVICE_ROLE_KEY`
 
 ### 🔧 How to Use
 
