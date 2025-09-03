@@ -1,5 +1,5 @@
 # PostgreSQL Database Configuration
-DATABASE_URL="postgres://gm_db_user:1c12364d5e59f4074382@easy.kelvinscale.net:8998/gm_db?sslmode=disable"
+DATABASE_URL="postgresql://username:password@localhost:5432/arcanum_scribe"
 # Ejemplo: postgresql://arcanum_user:password@tu-servidor.com:5432/arcanum_scribe
 
 # API Keys

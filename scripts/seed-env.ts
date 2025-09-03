@@ -1,9 +1,9 @@
-// Temporary environment configuration for seeder
-// In production, use a proper .env file
+// Environment configuration for seeder
+// SECURITY: Use environment variables for sensitive data
 
 export const SEEDER_ENV = {
-  SUPABASE_URL: "https://jsionesaegddqcngccie.supabase.co",
-  SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzaW9uZXNhZWdkZHFjbmdjY2llIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDE0NjI5MiwiZXhwIjoyMDY5NzIyMjkyfQ.JRzyiVsUdIgcCIhUR0YgE4PrCmueHsQeScrZMBQKCGo", // Replace with actual service role key
+  SUPABASE_URL: process.env.SUPABASE_URL || "https://your-project.supabase.co",
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "your-service-role-key-here",
   
   // Seeder Configuration
   USERS_COUNT: 50,
@@ -11,5 +11,5 @@ export const SEEDER_ENV = {
   INVITE_CODES_COUNT: 20,
   
   // Debug Mode
-  DEBUG: true
+  DEBUG: process.env.NODE_ENV === 'development'
 }; 

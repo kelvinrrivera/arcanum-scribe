@@ -255,3 +255,14 @@ tmp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Security: Prevent credential files from being committed
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+auth-tokens/
+*.env.backup
+*.env.old

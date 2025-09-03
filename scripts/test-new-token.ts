@@ -3,7 +3,8 @@ import { config } from 'dotenv';
 config();
 
 async function testNewToken() {
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjIxY2Y2NWYzLWU0MTMtNGFhMC1iZjk0LTA3MDVlMzE5MWY1ZSIsImVtYWlsIjoiYWRtaW5AYXJjYW51bS1zY3JpYmUuY29tIiwicm9sZSI6ImFkbWluIiwidGllciI6ImFkbWluIiwic3Vic2NyaXB0aW9uX3RpZXIiOiJhZG1pbiIsImlhdCI6MTc1NjkyODQ2MywiZXhwIjoxNzU3MDE0ODYzfQ.NFDEAG3vFdkWWkDOXNZYL4xToXPH0YoVus_gCv4Vgk8";
+  // SECURITY: Use environment variable for token
+  const token = process.env.TEST_AUTH_TOKEN || "your-test-token-here";
   
   try {
     console.log('🧪 Testing both endpoints with new token...');

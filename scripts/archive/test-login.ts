@@ -12,8 +12,8 @@ async function testLogin() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'admin@arcanum-scribe.com',
-        password: 'JwJttGk8fHvzgS4H' // Use the password from the security fix
+        email: process.env.TEST_ADMIN_EMAIL || 'admin@arcanum-scribe.com',
+        password: process.env.TEST_ADMIN_PASSWORD || 'your-test-password-here'
       })
     });
 

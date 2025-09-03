@@ -8,7 +8,8 @@ async function simulateAdminComponent() {
     
     // Step 1: Check for auth token (like the component does)
     console.log('\n🔑 Step 1: Checking authentication...');
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InRlc3QtYWRtaW4tdXNlciIsImVtYWlsIjoiYWRtaW5AdGVzdC5jb20iLCJyb2xlIjoiYWRtaW4iLCJ0aWVyIjoiYWRtaW4iLCJpYXQiOjE3NTY5MjEyMzUsImV4cCI6MTc1NzAwNzYzNX0.-WPB01EKbCJ3yuDGH6jVDfAc47JhIknEE2pMuBjfg7w';
+    // SECURITY: Use environment variable for token
+    const token = process.env.TEST_AUTH_TOKEN || 'your-test-token-here';
     
     if (!token) {
       console.log('❌ No auth token found');
