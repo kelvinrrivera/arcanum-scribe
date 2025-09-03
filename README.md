@@ -9,6 +9,10 @@
 
 Arcanum Scribe helps Game Masters create professional-quality TTRPG adventures using advanced AI. Generate complete adventures with storylines, encounters, NPCs, and locations in minutes instead of hours.
 
+## 🚀 **Repository Status**
+
+This repository has been cleaned and organized for production use. All obsolete documentation, debug scripts, and temporary files have been removed to provide a clean, professional codebase.
+
 ## 🎯 **Why Arcanum Scribe?**
 
 - **Save Time**: Generate complete adventures in minutes, not hours
