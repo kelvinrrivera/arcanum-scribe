@@ -1,0 +1,1 @@
+export { PrivacyControl } from './PrivacyControl';

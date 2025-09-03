@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, User, Sparkles } from 'lucide-react';
+import { BookOpen, LogOut, User, Sparkles, Shield } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,12 +22,18 @@ export function Header() {
           <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <span className="text-xl font-display font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Arcanum Scribe
           </span>
         </Link>
 
         <nav className="hidden md:flex items-center space-x-6">
+          <Link 
+            to="/gallery" 
+            className="text-sm font-medium transition-colors hover:text-primary"
+          >
+            Gallery
+          </Link>
           {user && (
             <>
               <Link 
@@ -82,6 +88,14 @@ export function Header() {
                     My Library
                   </Link>
                 </DropdownMenuItem>
+                {(profile?.subscription_tier === 'archmage' || profile?.subscription_tier === 'admin') && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="flex items-center">
+                      <Shield className="mr-2 h-4 w-4" />
+                      Admin Panel
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />

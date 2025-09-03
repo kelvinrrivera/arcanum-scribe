@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/hooks/useAuth';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,13 +21,15 @@ const signUpSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   displayName: z.string().min(2, 'Display name must be at least 2 characters'),
+  inviteCode: z.string().min(1, 'Invite code is required'),
 });
 
 type SignInForm = z.infer<typeof signInSchema>;
 type SignUpForm = z.infer<typeof signUpSchema>;
 
 export default function Auth() {
-  const { signIn, signUp, user, loading } = useAuth();
+  const { login, register, user, isLoading: loading } = useAuth();
+  const { trackUserSignUp, trackUserSignIn } = useAnalytics();
   const [isLoading, setIsLoading] = useState(false);
 
   const signInForm = useForm<SignInForm>({
@@ -44,13 +47,23 @@ export default function Auth() {
 
   const onSignIn = async (data: SignInForm) => {
     setIsLoading(true);
-    await signIn(data.email, data.password);
+    try {
+      await login(data.email, data.password);
+      trackUserSignIn('email');
+    } catch (error) {
+      console.error('Login error:', error);
+    }
     setIsLoading(false);
   };
 
   const onSignUp = async (data: SignUpForm) => {
     setIsLoading(true);
-    await signUp(data.email, data.password, data.displayName);
+    try {
+      await register(data.email, data.displayName, data.password);
+      trackUserSignUp('email');
+    } catch (error) {
+      console.error('Register error:', error);
+    }
     setIsLoading(false);
   };
 
@@ -220,6 +233,21 @@ export default function Auth() {
                     {signUpForm.formState.errors.password && (
                       <p className="text-sm text-destructive">
                         {signUpForm.formState.errors.password.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-invite">Invite Code</Label>
+                    <Input
+                      id="signup-invite"
+                      type="text"
+                      placeholder="Enter your invite code"
+                      {...signUpForm.register('inviteCode')}
+                    />
+                    {signUpForm.formState.errors.inviteCode && (
+                      <p className="text-sm text-destructive">
+                        {signUpForm.formState.errors.inviteCode.message}
                       </p>
                     )}
                   </div>

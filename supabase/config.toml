@@ -1,4 +1,0 @@
-project_id = "jsionesaegddqcngccie"
-
-[functions.generate-adventure]
-verify_jwt = false

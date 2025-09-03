@@ -1,3 +1,6 @@
+/* Font imports for the dual-theme system */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Nunito+Sans:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,107 +10,112 @@ All colors MUST be HSL.
 */
 
 @layer base {
-  :root {
-    /* Arcanum Scribe - Magical Theme */
-    --background: 270 10% 98%;
-    --foreground: 270 15% 8%;
-
-    --card: 280 15% 97%;
-    --card-foreground: 270 15% 12%;
-
-    --popover: 280 15% 97%;
-    --popover-foreground: 270 15% 12%;
-
-    /* Primary: Deep mystical purple */
-    --primary: 260 85% 35%;
-    --primary-foreground: 280 10% 98%;
-
-    /* Secondary: Soft enchanted lavender */
-    --secondary: 270 25% 90%;
-    --secondary-foreground: 270 15% 20%;
-
-    --muted: 270 20% 92%;
-    --muted-foreground: 270 10% 45%;
-
-    /* Accent: Magical gold */
-    --accent: 45 90% 65%;
-    --accent-foreground: 270 15% 12%;
-
-    --destructive: 0 75% 55%;
-    --destructive-foreground: 280 10% 98%;
-
-    --border: 270 15% 85%;
-    --input: 270 15% 92%;
-    --ring: 260 85% 45%;
-
-    --radius: 0.75rem;
-
-    /* Magical gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(260 85% 35%), hsl(280 75% 45%));
-    --gradient-secondary: linear-gradient(135deg, hsl(270 25% 90%), hsl(280 30% 85%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 90% 65%), hsl(50 85% 70%));
-    
-    /* Shadows with magical glow */
-    --shadow-magical: 0 10px 30px -10px hsl(260 85% 35% / 0.3);
-    --shadow-glow: 0 0 40px hsl(260 75% 55% / 0.2);
-
-    --sidebar-background: 270 20% 96%;
-    --sidebar-foreground: 270 15% 25%;
-    --sidebar-primary: 260 85% 35%;
-    --sidebar-primary-foreground: 280 10% 98%;
-    --sidebar-accent: 270 25% 88%;
-    --sidebar-accent-foreground: 270 15% 20%;
-    --sidebar-border: 270 15% 80%;
-    --sidebar-ring: 260 85% 45%;
+  /* Define fonts for the whole application */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-foreground;
+  }
+  body {
+    @apply font-sans bg-background text-foreground;
   }
 
-  .dark {
-    /* Dark mystical theme */
-    --background: 270 25% 8%;
-    --foreground: 280 15% 92%;
+  /* Theme Variables for Light Mode (Scribe) - Clean & Professional */
+  :root {
+    --background: 0 0% 100%; /* Pure White */
+    --foreground: 222.2 84% 4.9%; /* Almost Black */
 
-    --card: 270 30% 10%;
-    --card-foreground: 280 15% 90%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
 
-    --popover: 270 30% 10%;
-    --popover-foreground: 280 15% 90%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 260 75% 65%;
-    --primary-foreground: 270 25% 8%;
+    --primary: 262.1 83.3% 57.8%; /* Arcanum Scribe Purple */
+    --primary-foreground: 210 40% 98%; /* Light text for purple buttons */
 
-    --secondary: 270 20% 15%;
-    --secondary-foreground: 280 15% 85%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 270 20% 12%;
-    --muted-foreground: 270 10% 60%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 45 85% 60%;
-    --accent-foreground: 270 25% 8%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 65% 50%;
-    --destructive-foreground: 280 15% 92%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 270 20% 18%;
-    --input: 270 20% 15%;
-    --ring: 260 75% 55%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262.1 83.3% 57.8%; /* Purple focus ring */
 
-    /* Dark magical gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(260 75% 65%), hsl(280 65% 55%));
-    --gradient-secondary: linear-gradient(135deg, hsl(270 20% 15%), hsl(280 25% 20%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 85% 60%), hsl(50 80% 65%));
+    --radius: 0.5rem;
+
+    /* Refined gradients for light mode */
+    --gradient-primary: linear-gradient(135deg, hsl(262.1 83.3% 57.8%), hsl(280 75% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(210 40% 96.1%), hsl(220 30% 92%));
+    --gradient-accent: linear-gradient(135deg, hsl(210 40% 96.1%), hsl(220 35% 94%));
     
-    /* Enhanced dark shadows */
-    --shadow-magical: 0 10px 30px -10px hsl(260 75% 65% / 0.4);
-    --shadow-glow: 0 0 40px hsl(260 65% 45% / 0.3);
+    /* Professional shadows */
+    --shadow-magical: 0 10px 30px -10px hsl(262.1 83.3% 57.8% / 0.15);
+    --shadow-glow: 0 0 20px hsl(262.1 83.3% 57.8% / 0.1);
 
-    --sidebar-background: 270 25% 6%;
-    --sidebar-foreground: 280 15% 85%;
-    --sidebar-primary: 260 75% 65%;
-    --sidebar-primary-foreground: 270 25% 8%;
-    --sidebar-accent: 270 20% 12%;
-    --sidebar-accent-foreground: 280 15% 85%;
-    --sidebar-border: 270 20% 15%;
-    --sidebar-ring: 260 75% 55%;
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-primary: 262.1 83.3% 57.8%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 94%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 262.1 83.3% 57.8%;
+  }
+
+  /* Theme Variables for Dark Mode (Archmage) - Immersive & Magical */
+  .dark {
+    --background: 220 20% 8%; /* Dark blue, not pure black */
+    --foreground: 210 40% 98%; /* Light gray, not pure white */
+
+    --card: 220 20% 12%; /* Slightly lighter dark for cards */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 20% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 38 92% 50%; /* TaleForge Magical Gold */
+    --primary-foreground: 40 10% 10%; /* Dark text for gold buttons */
+
+    --secondary: 217 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+
+    --border: 217 32.6% 17.5%;
+    --input: 217 32.6% 17.5%;
+    --ring: 38 92% 50%; /* Gold focus ring for magical glow */
+
+    /* Magical dark gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(38 92% 50%), hsl(45 85% 55%));
+    --gradient-secondary: linear-gradient(135deg, hsl(217 32.6% 17.5%), hsl(220 25% 20%));
+    --gradient-accent: linear-gradient(135deg, hsl(38 92% 50%), hsl(42 88% 52%));
+    
+    /* Enhanced magical shadows */
+    --shadow-magical: 0 10px 30px -10px hsl(38 92% 50% / 0.3);
+    --shadow-glow: 0 0 40px hsl(38 82% 45% / 0.25);
+
+    --sidebar-background: 220 20% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 38 92% 50%;
+    --sidebar-primary-foreground: 40 10% 10%;
+    --sidebar-accent: 217 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 32.6% 17.5%;
+    --sidebar-ring: 38 92% 50%;
   }
 }
 
@@ -115,30 +123,405 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }
+}
 
-  /* Custom magical effects */
+@layer components {
+  /* Gradient backgrounds */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  /* Magical effects */
+  .magical-shadow {
+    box-shadow: var(--shadow-magical);
+  }
+  
   .magical-glow {
     box-shadow: var(--shadow-glow);
   }
 
-  .magical-shadow {
+  /* Improved spacing and layout */
+  .sidebar-width {
+    width: 18rem; /* 288px - slightly smaller than before */
+  }
+  
+  .main-content-padding {
+    @apply px-6 py-8;
+  }
+  
+  /* Better card styling */
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-xl;
+  }
+
+  /* Enhanced StatBlock styling */
+  .stat-block {
+    @apply transition-all duration-300;
+  }
+
+  .stat-block:hover {
+    transform: translateY(-2px);
     box-shadow: var(--shadow-magical);
   }
 
-  .gradient-primary {
-    background: var(--gradient-primary);
+  /* Ability score hover effects */
+  .ability-score-box {
+    @apply transition-all duration-200 hover:scale-105 hover:shadow-md;
   }
 
-  .gradient-secondary {
-    background: var(--gradient-secondary);
+  /* Combat tactics special styling */
+  .combat-tactics-section {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.05), hsl(var(--accent) / 0.02));
+    border: 2px solid hsl(var(--primary) / 0.2);
+    box-shadow: 0 8px 32px hsl(var(--primary) / 0.1);
   }
 
-  .gradient-accent {
-    background: var(--gradient-accent);
+  /* Action item animations */
+  .action-item {
+    @apply transition-all duration-200;
+  }
+
+  .action-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px hsl(var(--border) / 0.3);
+  }
+  
+  /* Improved button styling */
+  .btn-primary-gradient {
+    @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:from-primary/90 hover:to-primary/70;
+  }
+
+  /* Magical Image Effects */
+  .magical-image {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    transition: all 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  .magical-image:hover {
+    transform: scale(1.05) rotateY(5deg);
+    box-shadow: 
+      0 20px 40px rgba(0, 0, 0, 0.3),
+      0 0 80px hsl(var(--primary) / 0.4),
+      inset 0 0 20px hsl(var(--primary) / 0.1);
+  }
+
+  .magical-image::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent,
+      hsl(var(--primary) / 0.1),
+      transparent
+    );
+    transform: rotate(45deg);
+    transition: all 0.6s ease;
+    opacity: 0;
+    z-index: 1;
+  }
+
+  .magical-image:hover::before {
+    animation: shimmer 1.5s ease-in-out;
+    opacity: 1;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+  }
+
+  /* Floating Image Effect */
+  .floating-image {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotateZ(0deg); }
+    25% { transform: translateY(-10px) rotateZ(1deg); }
+    50% { transform: translateY(-5px) rotateZ(0deg); }
+    75% { transform: translateY(-15px) rotateZ(-1deg); }
+  }
+
+  /* Glow Border Effect */
+  .glow-border {
+    position: relative;
+  }
+
+  .glow-border::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(45deg, 
+      hsl(var(--primary)), 
+      hsl(var(--accent)), 
+      hsl(var(--primary))
+    );
+    background-size: 200% 200%;
+    animation: glow-rotate 3s linear infinite;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    -webkit-mask-composite: xor;
+    z-index: -1;
+  }
+
+  @keyframes glow-rotate {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Enhanced Toast Animations */
+  @keyframes toast-enter {
+    from {
+      transform: translateX(100%) scale(0.9);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes toast-exit {
+    to {
+      transform: translateX(100%) scale(0.9);
+      opacity: 0;
+    }
+  }
+
+  .toast-enter {
+    animation: toast-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .toast-exit {
+    animation: toast-exit 0.3s cubic-bezier(0.4, 0, 1, 1);
+  }
+
+  /* Enhanced Button Interactions */
+  .btn-magical {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-magical:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 25px hsl(var(--primary) / 0.3);
+  }
+
+  .btn-magical::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary-foreground) / 0.2), transparent);
+    transition: left 0.6s;
+  }
+
+  .btn-magical:hover::before {
+    left: 100%;
+  }
+
+  /* Loading Skeletons */
+  .skeleton {
+    background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.5) 50%, hsl(var(--muted)) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+  }
+
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Pulse Effect for Important Elements */
+  .pulse-magic {
+    animation: pulse-magic 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-magic {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.02);
+    }
+  }
+
+  /* Mobile-First StatBlock Improvements */
+  .stat-block {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .stat-block * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Responsive Grid Improvements - Better Balance */
+  @media (min-width: 1280px) {
+    /* Desktop: Restore majestic spacing - FORCED */
+    .stat-block {
+      min-height: 600px !important;
+    }
+    
+    .magical-image {
+      transform: perspective(1000px) !important;
+      transition: all 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+    }
+    
+    .magical-image:hover {
+      transform: perspective(1000px) rotateY(2deg) scale(1.02) !important;
+    }
+  }
+
+  /* FORCE Desktop Layout - Critical CSS Override */
+  @media (min-width: 1280px) {
+    .xl\\:grid-cols-5 {
+      grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    }
+    
+    .xl\\:col-span-2 {
+      grid-column: span 2 / span 2 !important;
+    }
+    
+    .xl\\:col-span-3 {
+      grid-column: span 3 / span 3 !important;
+    }
+    
+    .xl\\:h-96 {
+      height: 24rem !important;
+    }
+    
+    .xl\\:text-3xl {
+      font-size: 1.875rem !important;
+      line-height: 2.25rem !important;
+    }
+    
+    /* Clean presentation - no debug borders */
+  }
+
+  @media (max-width: 1279px) and (min-width: 1024px) {
+    .stat-block .grid-cols-3 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .stat-block .grid-cols-3 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    
+    .stat-block .grid-cols-6 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .stat-block .grid-cols-3,
+    .stat-block .grid-cols-6 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    
+    .stat-block .text-2xl {
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+    }
+    
+    .stat-block .text-lg {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  /* Responsive Text Scaling */
+  .responsive-text {
+    font-size: clamp(0.75rem, 2.5vw, 1rem);
+  }
+
+  .responsive-title {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+  }
+  
+  /* Better empty states */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-6 text-center;
+  }
+  
+  .empty-state-icon {
+    @apply w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mb-4;
+  }
+  
+  /* Improved navigation */
+  .nav-item {
+    @apply flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors;
+  }
+  
+  .nav-item-active {
+    @apply bg-primary text-primary-foreground;
+  }
+  
+  .nav-item-hover {
+    @apply hover:bg-accent hover:text-accent-foreground;
+  }
+  
+  /* Better user profile section */
+  .user-profile-compact {
+    @apply space-y-3 p-4;
+  }
+  
+  .user-info-compact {
+    @apply flex items-center space-x-3;
+  }
+  
+  .user-avatar-compact {
+    @apply h-9 w-9;
+  }
+  
+  .user-text-compact {
+    @apply text-sm font-medium truncate;
+  }
+  
+  .user-email-compact {
+    @apply text-xs text-muted-foreground truncate;
+  }
+  
+  /* Improved badges */
+  .badge-compact {
+    @apply text-xs px-2 py-1;
+  }
+  
+  /* Better spacing utilities */
+  .space-y-compact {
+    @apply space-y-2;
+  }
+  
+  .space-y-tight {
+    @apply space-y-1;
   }
 }
 
@@ -150,10 +533,10 @@ All colors MUST be HSL.
 
 @keyframes pulse-glow {
   0%, 100% { 
-    box-shadow: 0 0 20px hsl(260 75% 55% / 0.2);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
   }
   50% { 
-    box-shadow: 0 0 40px hsl(260 75% 55% / 0.4), 0 0 60px hsl(260 75% 55% / 0.2);
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.4), 0 0 60px hsl(var(--primary) / 0.2);
   }
 }
 
