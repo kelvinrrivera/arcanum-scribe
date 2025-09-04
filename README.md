@@ -40,6 +40,48 @@ This repository has been cleaned and organized for production use. All obsolete 
 - **Quality Control** - Content validation and enhancement
 - **Flexible Prompting** - Customizable generation parameters
 
+## 🤖 **How Kiro was Used**
+
+This project demonstrates advanced specification-driven development using Kiro, an AI development workflow system. The complete development process follows a **Specification → Implementation → Validation** pattern:
+
+### **📋 Kiro Specifications Drive Features**
+| Specification | Implementation | API Endpoints | Result |
+|--------------|----------------|---------------|---------|
+| `/.kiro/specs/advanced-prompt-system/` | `server/enhanced-adventure-prompt.js`<br>`server/llm-service.ts` | `/api/generate-adventure` | Multi-layered narrative generation with quality validation |
+| `/.kiro/specs/professional-mode-integration/` | `server/professional-layout-engine.ts`<br>`server/pdf-service.ts` | `/api/generate-adventure`<br>`/api/export/pdf` | Publication-ready adventures with professional formatting |
+| `/.kiro/specs/unified-tier-system/` | `server/tier-service.ts`<br>`server/magic-credits-service.ts` | `/api/user/tier-info`<br>`/api/user/magic-credits-info` | User management with credit system |
+| `/.kiro/specs/visual-tiers-system/` | `server/image-service.ts` | `/api/generate-adventure` (with images) | Automated image generation with Fal.ai |
+
+### **🔧 Executable Kiro Hooks**
+The `/.kiro/hooks/` directory contains working automation that demonstrates the spec-to-code workflow:
+
+- **`gen_adventure_from_spec.js`** - Reads Kiro specs and generates adventures via actual API calls
+- **`export_pdf_for_adventure.js`** - Creates professional PDFs using the Puppeteer service  
+- **`run_smoke_tests.js`** - Validates system health and generates quality reports
+
+### **📐 Steering Guidelines Ensure Quality**
+Implementation follows consistent patterns defined in `/.kiro/steering/`:
+- **Prompt Guidelines** - How specifications translate to effective AI prompts
+- **Code Generation Rules** - Architectural standards and naming conventions
+
+### **🎯 Kiro Demo Workflow**
+```bash
+# 1. Generate adventure from spec
+node .kiro/hooks/gen_adventure_from_spec.js professional-mode-integration
+
+# 2. Export to professional PDF
+node .kiro/hooks/export_pdf_for_adventure.js <adventure-id>
+
+# 3. Validate system quality  
+node .kiro/hooks/run_smoke_tests.js
+
+# 4. View generated artifacts
+open .kiro/artifacts/  # Adventures + PDFs
+open .kiro/reports/    # Quality reports
+```
+
+This demonstrates complete **traceability** from high-level specifications to working code to generated artifacts, with automated quality validation throughout the process.
+
 ## 🛠️ **Technology Stack**
 
 - **Frontend**: React 18 + TypeScript + Vite
