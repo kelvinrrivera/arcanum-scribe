@@ -778,16 +778,25 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
     console.log(`[GENERATE-ADVENTURE] Adventure summary: ${adventureContent?.summary?.substring(0, 100) || 'NO SUMMARY'}...`);
     console.log(`[GENERATE-ADVENTURE] Adventure content keys: ${Object.keys(adventureContent || {}).join(', ')}`);
 
-    // Generate images with advanced system
-    let imageResult = { imageUrls: [], totalCost: 0, errors: [] };
+    // Generate images with advanced system (guarded by timeout so request doesn't hang)
+    let imageResult = { imageUrls: [], totalCost: 0, errors: [] as string[] };
     try {
       console.log(`[GENERATE-ADVENTURE] Starting image generation for adventure: ${adventureContent.title}`);
       console.log(`[GENERATE-ADVENTURE] Adventure has ${adventureContent.monsters?.length || 0} monsters and ${adventureContent.magicItems?.length || 0} magic items`);
       console.log(`[GENERATE-ADVENTURE] User ID: ${userId}`);
-      
-      imageResult = await generateImages(adventureContent, userId);
+
+      const imageTimeoutMs = Number(process.env.IMAGE_GEN_TIMEOUT_MS || 45000);
+      const imageGenPromise = generateImages(adventureContent, userId);
+      const timeoutPromise = new Promise<typeof imageResult>((resolve) => {
+        setTimeout(() => {
+          console.log(`[GENERATE-ADVENTURE] Image generation timed out after ${imageTimeoutMs}ms. Proceeding without images.`);
+          resolve({ imageUrls: [], totalCost: 0, errors: ['Image generation timed out'] });
+        }, imageTimeoutMs);
+      });
+
+      imageResult = await Promise.race([imageGenPromise, timeoutPromise]);
       console.log(`[GENERATE-ADVENTURE] Images generated: ${imageResult.imageUrls.length} images, Cost: $${imageResult.totalCost.toFixed(4)}`);
-      
+
       if (imageResult.errors.length > 0) {
         console.log(`[GENERATE-ADVENTURE] Image generation errors:`, imageResult.errors);
       }
