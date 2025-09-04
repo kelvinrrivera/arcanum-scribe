@@ -302,7 +302,7 @@ describe('Adventure Generation Flow', () => {
     // Login
     const loginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'test@example.com', password: 'password' });
+      .send({ email: 'test@example.com', password: 'test-password' });
     
     const token = loginRes.body.token;
     

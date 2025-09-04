@@ -26,7 +26,7 @@ Login with email and password.
 ```json
 {
   "email": "user@example.com",
-  "password": "your-password"
+  "password": "your-secure-password"
 }
 ```
 
@@ -49,7 +49,7 @@ Register a new user account.
 ```json
 {
   "email": "user@example.com",
-  "password": "secure-password",
+  "password": "your-secure-password",
   "username": "username"
 }
 ```
