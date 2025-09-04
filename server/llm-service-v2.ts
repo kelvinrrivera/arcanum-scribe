@@ -163,66 +163,7 @@ export class LLMServiceV2 {
     }
   }
 
-  private async generateTextOriginal(prompt: string, systemPrompt: string, options: GenerationOptions = {}): Promise<string> {
-    const maxRetries = this.config.get('max_retries') || 3;
-    let lastError: Error | null = null;
-
-    // Get active models in priority order
-    const models = await this.getActiveModels();
-    
-    for (const model of models.slice(0, maxRetries)) {
-      try {
-        console.log(`🤖 Trying ${model.display_name} (${model.provider_type})`);
-        
-        const provider = this.providers.get(model.provider_type);
-        if (!provider) {
-          console.log(`❌ Provider ${model.provider_type} not available`);
-          continue;
-        }
-
-        const modelInstance = provider(model.model_name);
-        
-        const result = await generateText({
-          model: modelInstance,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
-          temperature: options.temperature || Number(model.temperature) || 0.7,
-          maxTokens: options.max_tokens || Number(model.max_tokens) || 4096,
-        });
-
-        console.log(`✅ Success with ${model.display_name}`);
-        
-        // Log the request for analytics
-        await this.logPromptRequest({
-          model_name: model.model_name,
-          provider: model.provider_type,
-          prompt_length: prompt.length,
-          response_length: result.text.length,
-          success: true
-        });
-
-        return result.text;
-
-      } catch (error) {
-        lastError = error as Error;
-        console.log(`❌ Failed with ${model.display_name}: ${lastError.message}`);
-        
-        // Log the failed request
-        await this.logPromptRequest({
-          model_name: model.model_name,
-          provider: model.provider_type,
-          prompt_length: prompt.length,
-          response_length: 0,
-          success: false,
-          error: lastError.message
-        });
-      }
-    }
-
-    throw new Error(`All LLM providers failed. Last error: ${lastError?.message}`);
-  }
+  // removed duplicate generateTextOriginal (kept single implementation below)
 
   async generateJSON<T>(
     prompt: string, 
