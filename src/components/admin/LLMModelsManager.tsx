@@ -164,17 +164,19 @@ export default function LLMModelsManager() {
     }
   };
 
-  const formatCost = (cost: number): string => {
-    if (cost < 1) return `$${cost.toFixed(3)}`;
-    return `$${cost.toFixed(2)}`;
+  const formatCost = (cost: number | string | null | undefined): string => {
+    const numCost = typeof cost === 'number' ? cost : parseFloat(String(cost || 0));
+    if (isNaN(numCost)) return '$0.00';
+    if (numCost < 1) return `$${numCost.toFixed(3)}`;
+    return `$${numCost.toFixed(2)}`;
   };
 
   const getProviderColor = (providerType: string): string => {
     switch (providerType) {
-      case 'anthropic': return 'bg-orange-100 text-orange-800';
-      case 'openai': return 'bg-green-100 text-green-800';
-      case 'google': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'anthropic': return 'bg-orange-500/10 text-orange-600 dark:text-orange-400';
+      case 'openai': return 'bg-green-500/10 text-green-600 dark:text-green-400';
+      case 'google': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -201,7 +203,7 @@ export default function LLMModelsManager() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">🤖 LLM Models Management</h2>
-          <p className="text-gray-600">Manage language models and test API connectivity</p>
+          <p className="text-muted-foreground">Manage language models and test API connectivity</p>
         </div>
         <Button onClick={fetchData} variant="outline">
           <Zap className="h-4 w-4 mr-2" />
@@ -228,10 +230,10 @@ export default function LLMModelsManager() {
                       {provider.provider_type}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {activeModels}/{providerModels.length} models active
                   </p>
-                  <p className="text-xs text-gray-500">Priority: {provider.priority}</p>
+                  <p className="text-xs text-muted-foreground">Priority: {provider.priority}</p>
                 </div>
               );
             })}
@@ -263,14 +265,14 @@ export default function LLMModelsManager() {
                     <div
                       key={model.id}
                       className={`p-4 border rounded-lg ${
-                        model.is_active ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                        model.is_active ? 'border-green-500/20 bg-green-500/10' : 'border-border bg-card'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h4 className="font-medium">{model.display_name}</h4>
-                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            <code className="text-xs bg-muted px-2 py-1 rounded">
                               {model.model_name}
                             </code>
                             <Badge variant={model.is_active ? 'default' : 'secondary'}>
@@ -278,7 +280,7 @@ export default function LLMModelsManager() {
                             </Badge>
                           </div>
                           
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span>💰 {formatCost(model.cost_per_1m_tokens)}/1M tokens</span>
                             <span>🎯 Max: {model.max_tokens.toLocaleString()} tokens</span>
                             <span>🌡️ Temp: {model.temperature}</span>
@@ -287,8 +289,8 @@ export default function LLMModelsManager() {
                           {testResult && (
                             <div className={`mt-2 p-2 rounded text-sm ${
                               testResult.success 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
+                                ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
+                                : 'bg-red-500/10 text-red-600 dark:text-red-400'
                             }`}>
                               {testResult.success ? (
                                 <div className="flex items-center gap-2">
@@ -338,8 +340,8 @@ export default function LLMModelsManager() {
       {models.length === 0 && (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">No LLM models found.</p>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-muted-foreground">No LLM models found.</p>
+            <p className="text-sm text-muted-foreground mt-2">
               Run the model update script to add the latest models.
             </p>
           </CardContent>

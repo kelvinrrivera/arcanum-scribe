@@ -128,7 +128,7 @@ async function initializeAdminTables() {
         name: 'Fal.ai',
         provider_type: 'fal',
         base_url: 'https://fal.run',
-        api_key_env: 'FAL_KEY',
+        api_key_env: 'FAL_API_KEY',
         is_active: true,
         priority: 1,
         config: {}

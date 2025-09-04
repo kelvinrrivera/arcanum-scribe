@@ -1,5 +1,6 @@
 import { LLMService } from './llm-service';
 import { query } from '../src/integrations/postgres/client';
+import { AdventureProgressTracker } from './adventure-progress-tracker';
 
 interface ImageGenerationRequest {
   prompt: string;
@@ -31,15 +32,38 @@ export class ImageService {
     { provider: 'OpenAI', model: 'dall-e-3' }
   ];
 
+  private activeFalModels: any[] = [];
+
   constructor() {
     this.llmService = new LLMService();
   }
 
   async initialize() {
     await this.llmService.initialize();
+    await this._loadFalModels();
   }
 
-  async generateAdventureImages(adventure: any, userId: string): Promise<{
+  private async _loadFalModels() {
+    try {
+      const { rows } = await query(`
+        SELECT model_id, display_name, pricing_per_megapixel
+        FROM fal_models 
+        WHERE is_active = true 
+        ORDER BY priority ASC
+      `);
+      this.activeFalModels = rows;
+      console.log(`✅ Loaded ${this.activeFalModels.length} active Fal.ai models from DB.`);
+    } catch (error) {
+      console.error('❌ Failed to load Fal.ai models from DB. Using hardcoded fallbacks.', error);
+      // Fallback to original hardcoded values if DB fails
+      this.activeFalModels = [
+        { model_id: 'fal-ai/flux-dev', display_name: 'Fal.ai Flux Dev (Fallback)' },
+        { model_id: 'fal-ai/fast-sdxl', display_name: 'Fal.ai Fast SDXL (Fallback)' },
+      ];
+    }
+  }
+
+  async generateAdventureImages(adventure: any, userId: string, progressTracker?: AdventureProgressTracker): Promise<{
     imageUrls: string[];
     totalCost: number;
     errors: string[];
@@ -84,7 +108,7 @@ export class ImageService {
         // CRITICAL: This order must match how AdventureView.tsx expects images!
         
         // First: Monster images (indices 0 to monsters.length-1)
-        const monsterImages = await this.generateMonsterImages(adventure.monsters || [], narrativeContext);
+        const monsterImages = await this.generateMonsterImages(adventure.monsters || [], narrativeContext, progressTracker);
         result.imageUrls.push(...monsterImages.urls);
         result.totalCost += monsterImages.cost;
         result.errors.push(...monsterImages.errors);
@@ -98,7 +122,7 @@ export class ImageService {
         console.log(`✨ Generated ${itemImages.urls.length} item images (indices ${monsterImages.urls.length}-${monsterImages.urls.length + itemImages.urls.length - 1})`);
 
         // Additional images for scenes and NPCs (not currently used in interface but good to have)
-        const sceneImages = await this.generateSceneImages(adventure.scenes || [], narrativeContext);
+        const sceneImages = await this.generateSceneImages(adventure.scenes || [], narrativeContext, progressTracker);
         result.imageUrls.push(...sceneImages.urls);
         result.totalCost += sceneImages.cost;
         result.errors.push(...sceneImages.errors);
@@ -130,14 +154,20 @@ export class ImageService {
     return result;
   }
 
-  private async generateMonsterImages(monsters: any[], narrativeContext?: any): Promise<{
+  private async generateMonsterImages(monsters: any[], narrativeContext?: any, progressTracker?: AdventureProgressTracker): Promise<{
     urls: string[];
     cost: number;
     errors: string[];
   }> {
     const result = { urls: [], cost: 0, errors: [] };
 
-    for (const monster of monsters) {
+    for (let i = 0; i < monsters.length; i++) {
+      const monster = monsters[i];
+      
+      // Update progress for monster generation
+      if (progressTracker) {
+        progressTracker.generatingMonsterImages(monster.name, i + 1, monsters.length);
+      }
       try {
         const imagePrompt = this.buildMonsterImagePrompt(monster, narrativeContext);
         const imageResult = await this.generateImageWithFallback(imagePrompt);
@@ -157,14 +187,20 @@ export class ImageService {
     return result;
   }
 
-  private async generateSceneImages(scenes: any[], narrativeContext?: any): Promise<{
+  private async generateSceneImages(scenes: any[], narrativeContext?: any, progressTracker?: AdventureProgressTracker): Promise<{
     urls: string[];
     cost: number;
     errors: string[];
   }> {
     const result = { urls: [], cost: 0, errors: [] };
 
-    for (const scene of scenes) {
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      
+      // Update progress for scene generation
+      if (progressTracker) {
+        progressTracker.generatingSceneImages(scene.title, i + 1, scenes.length);
+      }
       try {
         const imagePrompt = this.buildSceneImagePrompt(scene, narrativeContext);
         const imageResult = await this.generateImageWithFallback(imagePrompt);
@@ -239,18 +275,24 @@ export class ImageService {
   }
 
   private async generateImageWithFallback(prompt: string, retryCount = 0): Promise<ImageGenerationResult> {
-    // Try each provider in order
-    for (const fallback of this.fallbackProviders) {
+    // Try each active Fal.ai model from the database first
+    for (const falModel of this.activeFalModels) {
       try {
-        const result = await this.generateImageWithProvider(prompt, fallback.provider, fallback.model);
-        
-        if (result.success) {
-          return result;
-        }
+        const result = await this.generateImageWithProvider(prompt, 'Fal.ai', falModel.model_id);
+        if (result.success) return result;
       } catch (error) {
-        console.log(`Failed with ${fallback.provider}/${fallback.model}: ${error}`);
+        console.log(`[Image-Fallback] Fal.ai model ${falModel.model_id} failed: ${error.message}`);
         continue;
       }
+    }
+
+    // If all Fal.ai models failed, try OpenAI as a final fallback
+    try {
+      console.log('[Image-Fallback] Trying OpenAI DALL-E 3 as final fallback.');
+      const result = await this.generateImageWithProvider(prompt, 'OpenAI', 'dall-e-3');
+      if (result.success) return result;
+    } catch (error) {
+      console.log(`[Image-Fallback] OpenAI DALL-E 3 failed: ${error.message}`);
     }
 
     // If all providers failed and we haven't exceeded retries, try again with a simplified prompt
@@ -324,20 +366,10 @@ export class ImageService {
         throw new Error('Fal.ai API key not found');
       }
       
-      // Mapear el modelo correctamente para Fal.ai SDK
-      let appId;
-      if (model.includes('flux-dev') || model.includes('flux/dev')) {
-        appId = 'fal-ai/flux/dev';
-      } else if (model.includes('sdxl')) {
-        appId = 'fal-ai/fast-sdxl';
-      } else {
-        // Por defecto usar flux-dev que es nuestro modelo preferido
-        appId = 'fal-ai/flux/dev';
-      }
-        
-        const input = {
-          prompt: prompt
-        };
+      const appId = model; // The model name from DB is the full appId
+      const input = {
+        prompt: prompt
+      };
       
       console.log(`🖼️  Using Fal.ai SDK with ${appId} (requested model: ${model})...`);
       

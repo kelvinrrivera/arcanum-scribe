@@ -145,22 +145,36 @@ export class LLMServiceV2 {
   private async loadSystemConfig() {
     try {
       const { rows } = await query(`
-        SELECT key, value, description 
-        FROM system_config 
-        WHERE key IN ('max_retries', 'timeout_seconds', 'default_temperature')
+        SELECT key, value 
+        FROM system_config
       `);
 
-      rows.forEach((row: any) => {
-        this.config.set(row.key, row.value);
+      rows.forEach((item: any) => {
+        try {
+          this.config.set(item.key, JSON.parse(item.value));
+        } catch (error) {
+          // If JSON parsing fails, use the raw value
+          this.config.set(item.key, item.value);
+        }
       });
-
-      console.log('✅ System configuration loaded');
     } catch (error) {
-      console.log('⚠️  Using default system configuration');
-      this.config.set('max_retries', 3);
-      this.config.set('timeout_seconds', 30);
-      this.config.set('default_temperature', 0.7);
+      console.error('Error loading system config:', error);
+      // Set defaults
+      this.config.set('default_llm_provider', 'OpenRouter');
+      this.config.set('default_llm_model', 'google/gemini-2.5-flash');
     }
+  }
+
+  private _getModelInstance(model: LLMModel & { provider_type: string }) {
+    const provider = this.providers.get(model.provider_type);
+    if (!provider) {
+      console.warn(`[LLM-ORCHESTRATION] Provider '${model.provider_type}' found in DB but not initialized in LLMServiceV2. Skipping model ${model.display_name}.`);
+      return null;
+    }
+
+    // Vercel AI SDK expects the native model name without the provider prefix.
+    const nativeModelName = model.model_name.split('/').pop() || model.model_name;
+    return provider(nativeModelName);
   }
 
   // removed duplicate generateTextOriginal (kept single implementation below)
@@ -181,13 +195,8 @@ export class LLMServiceV2 {
       try {
         console.log(`🤖 Trying JSON generation with ${model.display_name} (${model.provider_type})`);
         
-        const provider = this.providers.get(model.provider_type);
-        if (!provider) {
-          console.log(`❌ Provider ${model.provider_type} not available`);
-          continue;
-        }
-
-        const modelInstance = provider(model.model_name);
+        const modelInstance = this._getModelInstance(model);
+        if (!modelInstance) continue;
         
         const result = await generateObject({
           model: modelInstance,
@@ -325,10 +334,6 @@ export class LLMServiceV2 {
    * Internal text generation method
    */
   private async generateTextInternal(prompt: string, systemPrompt: string, options: GenerationOptions = {}): Promise<string> {
-    return this.generateTextOriginal(prompt, systemPrompt, options);
-  }
-
-  private async generateTextOriginal(prompt: string, systemPrompt: string, options: GenerationOptions = {}): Promise<string> {
     const maxRetries = this.config.get('max_retries') || 3;
     let lastError: Error | null = null;
 
@@ -339,13 +344,8 @@ export class LLMServiceV2 {
       try {
         console.log(`🤖 Trying ${model.display_name} (${model.provider_type})`);
         
-        const provider = this.providers.get(model.provider_type);
-        if (!provider) {
-          console.log(`❌ Provider ${model.provider_type} not available`);
-          continue;
-        }
-
-        const modelInstance = provider(model.model_name);
+        const modelInstance = this._getModelInstance(model);
+        if (!modelInstance) continue;
         
         const result = await generateText({
           model: modelInstance,
@@ -403,13 +403,8 @@ export class LLMServiceV2 {
       try {
         console.log(`🤖 Trying ${model.display_name} (${model.provider_type}) with generateObject`);
         
-        const provider = this.providers.get(model.provider_type);
-        if (!provider) {
-          console.log(`❌ Provider ${model.provider_type} not available`);
-          continue;
-        }
-
-        const modelInstance = provider(model.model_name);
+        const modelInstance = this._getModelInstance(model);
+        if (!modelInstance) continue;
         
         // Use generateObject with the Zod schema
         const result = await generateObject({

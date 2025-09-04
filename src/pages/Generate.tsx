@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { AdventureWizard } from '@/components/adventure-wizard/AdventureWizard';
 import { TierUsageIndicator } from '@/components/tier';
 import { CreditPurchaseModal } from '@/components/tier/CreditPurchaseModal';
+import { AdventureProgress } from '@/components/AdventureProgress';
+import { useAdventureProgress } from '@/hooks/useAdventureProgress';
 import { ContentTypeSelector, ContentType } from '@/components/generation/ContentTypeSelector';
 import { MonsterGenerator } from '@/components/generation/MonsterGenerator';
 import { NPCGenerator } from '@/components/generation/NPCGenerator';
@@ -27,11 +29,13 @@ import {
 } from 'lucide-react';
 
 export default function Generate() {
+  // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL HOOKS
   const { user, isLoading } = useAuth();
   const { trackAdventureGenerated } = useAnalytics();
   const navigate = useNavigate();
-  // Professional mode is now always enabled - no toggle needed
+  const { progress: adventureProgress, startProgress, clearProgress } = useAdventureProgress(user?.id || null);
 
+  // ALL useState hooks
   const [gameSystem, setGameSystem] = useState('dnd5e');
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -41,35 +45,21 @@ export default function Generate() {
   const [tierLoading, setTierLoading] = useState(true);
   const [showCreditPurchase, setShowCreditPurchase] = useState(false);
   const [creditPurchaseLoading, setCreditPurchaseLoading] = useState(false);
-  
-  // New modular generation states
   const [currentView, setCurrentView] = useState<'selector' | 'generator' | 'result'>('selector');
   const [selectedContentType, setSelectedContentType] = useState<ContentType | null>(null);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [userCredits, setUserCredits] = useState(0);
 
-  // Show loading while auth is being verified
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated and fetch tier info
+  // ALL useEffect hooks
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-
     fetchUserTier();
   }, [user, navigate]);
 
+  // ALL FUNCTIONS DEFINED AFTER HOOKS
   const fetchUserTier = async () => {
     try {
       const response = await fetch('/api/user/tier-info', {
@@ -95,21 +85,17 @@ export default function Generate() {
     }
   };
 
-  // Handle content type selection
   const handleContentTypeSelect = (contentType: ContentType) => {
     setSelectedContentType(contentType);
     setCurrentView('generator');
   };
 
-  // Handle generation completion
   const handleGenerationComplete = (content: any) => {
     setGeneratedContent(content);
     setCurrentView('result');
-    // Refresh credits after generation
     fetchUserTier();
   };
 
-  // Handle back navigation
   const handleBack = () => {
     if (currentView === 'result') {
       setCurrentView('generator');
@@ -119,18 +105,208 @@ export default function Generate() {
     }
   };
 
-  // Handle new generation
   const handleNewGeneration = () => {
     setCurrentView('selector');
     setSelectedContentType(null);
     setGeneratedContent(null);
   };
 
+  const handleWizardComplete = async (prompt: string, selectedGameSystem: string, wizardData?: any) => {
+    if (!user) {
+      toast.error('Please log in to generate adventures.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setProgress(0);
+    startProgress(); // Start the WebSocket progress tracking
+    setShowWizard(false);
+
+    try {
+      const steps = [
+        'Initializing professional generation...',
+        'Analyzing prompt with advanced AI...',
+        'Generating complex puzzles...',
+        'Creating detailed NPCs...',
+        'Designing tactical encounters...',
+        'Applying professional layout...',
+        'Finalizing enhanced adventure...',
+      ];
+
+      setCurrentStep(steps[0]);
+
+      let stepIndex = 0;
+      const progressInterval = setInterval(() => {
+        if (stepIndex < steps.length) {
+          setCurrentStep(steps[stepIndex]);
+          setProgress((stepIndex + 1) * (80 / steps.length));
+          stepIndex++;
+        }
+      }, 1500);
+
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      const defaultPrivacy = userTier === 'architect' ? 'private' : 'public';
+
+      const requestBody = {
+        prompt,
+        gameSystem: selectedGameSystem,
+        privacy: wizardData?.privacy || defaultPrivacy,
+        playerLevel: wizardData?.playerLevel,
+        partySize: wizardData?.partySize,
+        duration: wizardData?.duration,
+        tone: wizardData?.tone,
+        setting: wizardData?.setting,
+        themes: wizardData?.themes,
+        professionalMode: {
+          enabled: true,
+          features: {
+            enhancedNPCs: true,
+            multiSolutionPuzzles: true,
+            tacticalCombat: true,
+            professionalLayout: true,
+            editorialExcellence: true,
+            accessibilityFeatures: true
+          }
+        }
+      };
+
+      const response = await fetch('/api/generate-adventure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate adventure');
+      }
+
+      const result = await response.json();
+
+      if (result && (result.professionalEnhancement || result.qualityMetrics)) {
+        console.log('Professional quality adventure generated successfully');
+      }
+
+      clearInterval(progressInterval);
+
+      if (!result) {
+        throw new Error('No adventure data received');
+      }
+
+      setProgress(100);
+      setCurrentStep('Professional adventure complete!');
+
+      trackAdventureGenerated(selectedGameSystem, prompt.length);
+      toast.success('Professional Adventure Created!');
+
+      setTimeout(() => {
+        let adventureId = result.originalAdventure?.id || result.adventure?.id || result.id || result._id;
+        
+        if (!adventureId) {
+          adventureId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+
+        const sessionKey = `adventure_${adventureId}`;
+        const adventureData = result;
+
+        try {
+          sessionStorage.setItem(sessionKey, JSON.stringify(adventureData));
+        } catch (storageError) {
+          console.error('Failed to store in sessionStorage:', storageError);
+        }
+
+        fetchUserTier();
+        navigate(`/adventure/${adventureId}`);
+      }, 500);
+
+    } catch (error: any) {
+      setProgress(0);
+      setCurrentStep('');
+      
+      if (error.message?.includes('Insufficient credits')) {
+        toast.error('Insufficient credits. Please upgrade your plan.');
+      } else if (error.message?.includes('rate limit')) {
+        toast.error('Too many requests. Please wait a moment and try again.');
+      } else {
+        toast.error(error.message || 'Failed to generate adventure. Please try again.');
+      }
+    } finally {
+      setIsGenerating(false);
+      clearProgress(); // Clear progress when done (success or error)
+    }
+  };
+
+  const resetWizard = () => {
+    setShowWizard(true);
+    setIsGenerating(false);
+    setProgress(0);
+    setCurrentStep('');
+  };
+
+  const handleCreditPurchase = async (packageId: string) => {
+    setCreditPurchaseLoading(true);
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        toast.error('Please log in to purchase credits');
+        return;
+      }
+
+      const response = await fetch('/api/credits/purchase', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ packageId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create purchase');
+      }
+
+      const result = await response.json();
+      
+      if (result.clientSecret) {
+        toast.success('Redirecting to payment...');
+      } else {
+        toast.success('Credits purchased successfully!');
+        setShowCreditPurchase(false);
+        fetchUserTier();
+      }
+    } catch (error) {
+      console.error('Credit purchase error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to purchase credits');
+    } finally {
+      setCreditPurchaseLoading(false);
+    }
+  };
+
+  // ALL CONDITIONAL RETURNS AT THE END
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return null;
   }
 
-  // Show loading while checking tier
   if (tierLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
@@ -142,13 +318,11 @@ export default function Generate() {
     );
   }
 
-  // Redirect Reader tier users to gallery with upgrade prompt
   if (userTier === 'reader') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
         <main className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-4">
                 ✨ Discover Amazing Legends
@@ -159,7 +333,6 @@ export default function Generate() {
               </p>
             </div>
 
-            {/* Upgrade Prompt */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-background">
                 <CardHeader>
@@ -249,33 +422,6 @@ export default function Generate() {
               </Card>
             </div>
 
-            {/* Credit Costs Reference */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle className="text-center">✨ What You Can Create with Magic Credits</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-3 gap-4 text-center">
-                  <div className="p-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg border border-border">
-                    <div className="text-2xl font-bold text-primary mb-2">3 ✨</div>
-                    <div className="font-semibold text-foreground">Full Adventure</div>
-                    <div className="text-sm text-muted-foreground">Complete with encounters, NPCs, story</div>
-                  </div>
-                  <div className="p-4 bg-gradient-to-br from-accent/20 to-primary/20 rounded-lg border border-border">
-                    <div className="text-2xl font-bold text-primary mb-2">1 ✨</div>
-                    <div className="font-semibold text-foreground">Individual Components</div>
-                    <div className="text-sm text-muted-foreground">NPCs, Monsters, Items, Puzzles</div>
-                  </div>
-                  <div className="p-4 bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg border border-border">
-                    <div className="text-2xl font-bold text-primary mb-2">1 ✨</div>
-                    <div className="font-semibold text-foreground">Regenerate Section</div>
-                    <div className="text-sm text-muted-foreground">Improve existing content</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Gallery CTA */}
             <Card className="text-center">
               <CardContent className="py-8">
                 <h2 className="text-2xl font-bold mb-4">
@@ -299,198 +445,11 @@ export default function Generate() {
     );
   }
 
-  const handleWizardComplete = async (prompt: string, selectedGameSystem: string, wizardData?: any) => {
-    if (!user) {
-      toast.error('Please log in to generate adventures.');
-      return;
-    }
-
-    setIsGenerating(true);
-    setProgress(0);
-    setShowWizard(false);
-
-    try {
-      // Always use professional generation steps
-      const steps = [
-        'Initializing professional generation...',
-        'Analyzing prompt with advanced AI...',
-        'Generating complex puzzles...',
-        'Creating detailed NPCs...',
-        'Designing tactical encounters...',
-        'Applying professional layout...',
-        'Finalizing enhanced adventure...',
-      ];
-
-      setCurrentStep(steps[0]);
-
-      let stepIndex = 0;
-      const progressInterval = setInterval(() => {
-        if (stepIndex < steps.length) {
-          setCurrentStep(steps[stepIndex]);
-          setProgress((stepIndex + 1) * (80 / steps.length));
-          stepIndex++;
-        }
-      }, 1500);
-
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('No authentication token found. Please log in again.');
-      }
-
-      // Determine default privacy based on tier
-      const defaultPrivacy = userTier === 'architect' ? 'private' : 'public';
-
-      const requestBody = {
-        prompt,
-        gameSystem: selectedGameSystem,
-        privacy: wizardData?.privacy || defaultPrivacy,
-        playerLevel: wizardData?.playerLevel,
-        partySize: wizardData?.partySize,
-        duration: wizardData?.duration,
-        tone: wizardData?.tone,
-        setting: wizardData?.setting,
-        themes: wizardData?.themes,
-        professionalMode: {
-          enabled: true,
-          features: {
-            enhancedNPCs: true,
-            multiSolutionPuzzles: true,
-            tacticalCombat: true,
-            professionalLayout: true,
-            editorialExcellence: true,
-            accessibilityFeatures: true
-          }
-        }
-      };
-
-      const response = await fetch('/api/generate-adventure', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate adventure');
-      }
-
-      const result = await response.json();
-
-      // Professional quality analysis is always performed
-      if (result && (result.professionalEnhancement || result.qualityMetrics)) {
-        console.log('Professional quality adventure generated successfully');
-      }
-
-      clearInterval(progressInterval);
-
-      if (!result) {
-        throw new Error('No adventure data received');
-      }
-
-      setProgress(100);
-      setCurrentStep('Professional adventure complete!');
-
-      trackAdventureGenerated(selectedGameSystem, prompt.length);
-
-      toast.success('Professional Adventure Created!');
-
-      // Handle full adventure completion
-      setTimeout(() => {
-        let adventureId = result.originalAdventure?.id || result.adventure?.id || result.id || result._id;
-        
-        if (!adventureId) {
-          adventureId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        }
-
-        const sessionKey = `adventure_${adventureId}`;
-        const adventureData = result; // Always professional quality
-
-        try {
-          sessionStorage.setItem(sessionKey, JSON.stringify(adventureData));
-        } catch (storageError) {
-          console.error('Failed to store in sessionStorage:', storageError);
-        }
-
-        // Refresh credits and navigate
-        fetchUserTier();
-        navigate(`/adventure/${adventureId}`);
-      }, 500);
-
-    } catch (error: any) {
-      setProgress(0);
-      setCurrentStep('');
-      
-      if (error.message?.includes('Insufficient credits')) {
-        toast.error('Insufficient credits. Please upgrade your plan.');
-      } else if (error.message?.includes('rate limit')) {
-        toast.error('Too many requests. Please wait a moment and try again.');
-      } else {
-        toast.error(error.message || 'Failed to generate adventure. Please try again.');
-      }
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const resetWizard = () => {
-    setShowWizard(true);
-    setIsGenerating(false);
-    setProgress(0);
-    setCurrentStep('');
-  };
-
-  const handleCreditPurchase = async (packageId: string) => {
-    setCreditPurchaseLoading(true);
-    
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        toast.error('Please log in to purchase credits');
-        return;
-      }
-
-      const response = await fetch('/api/credits/purchase', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ packageId })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create purchase');
-      }
-
-      const result = await response.json();
-      
-      if (result.clientSecret) {
-        // Handle Stripe payment here
-        toast.success('Redirecting to payment...');
-        // TODO: Integrate with Stripe Elements
-      } else {
-        toast.success('Credits purchased successfully!');
-        setShowCreditPurchase(false);
-        // Refresh tier data
-        fetchUserTier();
-      }
-    } catch (error) {
-      console.error('Credit purchase error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to purchase credits');
-    } finally {
-      setCreditPurchaseLoading(false);
-    }
-  };
-
+  // MAIN RENDER - Only reached if all conditions pass
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header */}
           <div className="text-center space-y-6">
             <div className="relative inline-block">
               <h1 className="text-4xl xl:text-5xl font-display font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
@@ -502,7 +461,6 @@ export default function Generate() {
               Forge complete adventures or individual components with precision and creativity
             </p>
             
-            {/* Status */}
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Badge variant="secondary" className="px-4 py-2">
                 <Crown className="h-4 w-4 mr-2 text-primary" />
@@ -515,9 +473,6 @@ export default function Generate() {
             </div>
           </div>
 
-          {/* Professional quality is now standard - no toggle needed */}
-
-          {/* Tier Usage and Game System */}
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             <TierUsageIndicator 
               onPurchaseCredits={() => setShowCreditPurchase(true)}
@@ -542,7 +497,6 @@ export default function Generate() {
             </Card>
           </div>
 
-          {/* Main Content - Modular Generation System */}
           {currentView === 'selector' && (
             <ContentTypeSelector 
               onSelect={handleContentTypeSelect}
@@ -600,7 +554,6 @@ export default function Generate() {
             />
           )}
 
-          {/* Generation Progress (for full adventures) */}
           {isGenerating && selectedContentType?.id === 'fullAdventure' && (
             <Card className="max-w-2xl mx-auto">
               <CardHeader>
@@ -635,12 +588,16 @@ export default function Generate() {
         </div>
       </main>
 
-      {/* Credit Purchase Modal */}
       <CreditPurchaseModal
         isOpen={showCreditPurchase}
         onClose={() => setShowCreditPurchase(false)}
         onPurchase={handleCreditPurchase}
         isLoading={creditPurchaseLoading}
+      />
+
+      <AdventureProgress
+        progress={adventureProgress}
+        isVisible={isGenerating && !!adventureProgress}
       />
     </div>
   );

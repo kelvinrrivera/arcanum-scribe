@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -17,6 +19,7 @@ import { PromptManagementService } from './prompt-management-service';
 import { createAdminRoutes } from './admin-routes';
 import { Pool } from 'pg';
 import LoggingService from './logging-middleware';
+import { AdventureProgressTracker } from './adventure-progress-tracker';
 import { 
   validateRequest, 
   MonsterGenerationSchema, 
@@ -39,6 +42,13 @@ import {
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:8080",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 3000;
 
 // Database pool
@@ -721,6 +731,10 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
 
     console.log(`[GENERATE-ADVENTURE] Request from user ${userId}: ${prompt.substring(0, 100)}...`);
 
+    // Initialize progress tracker
+    const progressTracker = new AdventureProgressTracker(io, userId);
+    progressTracker.start();
+
     // Check magic credits limit
     const magicCreditsService = new MagicCreditsService(pool);
     const canGenerate = await magicCreditsService.canUserAffordAction(userId, 'fullAdventure');
@@ -746,15 +760,17 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
     }
 
     // Initialize LLM service V2 (Vercel AI SDK)
+    progressTracker.initializingLLM();
     const llmService = new LLMServiceV2();
     await llmService.initialize();
 
     // Generate adventure
     console.log(`[GENERATE-ADVENTURE] About to call generateAdventure function`);
+    progressTracker.generatingCore();
     console.log(`[GENERATE-ADVENTURE] Professional mode: ${professionalMode?.enabled ? 'ENABLED' : 'DISABLED'}`);
     
     const startTime = Date.now();
-    const adventureContent = await generateAdventure(llmService, prompt, gameSystem, professionalMode);
+    const adventureContent = await generateAdventure(llmService, prompt, gameSystem, professionalMode, progressTracker);
     const endTime = Date.now();
     
     // Log the adventure generation
@@ -779,18 +795,22 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
     console.log(`[GENERATE-ADVENTURE] Adventure content keys: ${Object.keys(adventureContent || {}).join(', ')}`);
 
     // Generate images with advanced system (guarded by timeout so request doesn't hang)
+    progressTracker.startingImages();
     let imageResult = { imageUrls: [], totalCost: 0, errors: [] as string[] };
     try {
       console.log(`[GENERATE-ADVENTURE] Starting image generation for adventure: ${adventureContent.title}`);
       console.log(`[GENERATE-ADVENTURE] Adventure has ${adventureContent.monsters?.length || 0} monsters and ${adventureContent.magicItems?.length || 0} magic items`);
       console.log(`[GENERATE-ADVENTURE] User ID: ${userId}`);
 
-      const imageTimeoutMs = Number(process.env.IMAGE_GEN_TIMEOUT_MS || 45000);
-      const imageGenPromise = generateImages(adventureContent, userId);
+      const imageTimeoutMs = Number(process.env.IMAGE_GEN_TIMEOUT_MS || 360000); // Default 6 minutes
+      console.log(`[GENERATE-ADVENTURE] Image generation timeout set to ${imageTimeoutMs}ms (${Math.round(imageTimeoutMs/1000)}s)`);
+      
+      const imageGenPromise = generateImages(adventureContent, userId, progressTracker);
       const timeoutPromise = new Promise<typeof imageResult>((resolve) => {
         setTimeout(() => {
-          console.log(`[GENERATE-ADVENTURE] Image generation timed out after ${imageTimeoutMs}ms. Proceeding without images.`);
-          resolve({ imageUrls: [], totalCost: 0, errors: ['Image generation timed out'] });
+          console.log(`[GENERATE-ADVENTURE] ⚠️ Image generation timed out after ${imageTimeoutMs}ms. Proceeding without images.`);
+          console.log(`[GENERATE-ADVENTURE] This may indicate that image generation is taking longer than expected.`);
+          resolve({ imageUrls: [], totalCost: 0, errors: [`Image generation timed out after ${Math.round(imageTimeoutMs/1000)} seconds`] });
         }, imageTimeoutMs);
       });
 
@@ -801,12 +821,21 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
         console.log(`[GENERATE-ADVENTURE] Image generation errors:`, imageResult.errors);
       }
     } catch (error) {
-      console.log(`[GENERATE-ADVENTURE] Image generation failed, continuing without images: ${error}`);
-      console.log(`[GENERATE-ADVENTURE] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
-      imageResult = { imageUrls: [], totalCost: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] };
+      console.log(`[GENERATE-ADVENTURE] 🚨 Image generation failed, continuing without images: ${error}`);
+      console.log(`[GENERATE-ADVENTURE] Error details:`, {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      imageResult = { 
+        imageUrls: [], 
+        totalCost: 0, 
+        errors: [error instanceof Error ? `Image generation error: ${error.message}` : 'Unknown image generation error'] 
+      };
     }
 
-    // Consume magic credits
+    // Consume magic credits and save adventure
+    progressTracker.savingAdventure();
     const creditsConsumed = await magicCreditsService.consumeCredits(userId, 'fullAdventure', {
       adventure_title: adventureContent.title,
       game_system: gameSystem,
@@ -854,8 +883,9 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
     const adventure = adventures[0];
 
     console.log(`[GENERATE-ADVENTURE] Adventure saved and credits updated for user ${userId}`);
-
-    res.json({
+    
+    // Create response object and log key data for debugging
+    const responseData = {
       // Flatten the adventure content to the top level for frontend compatibility
       ...adventureContent,
       // Add database info
@@ -867,10 +897,24 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
       imageUrls: imageResult.imageUrls,
       imageErrors: imageResult.errors,
       imageCost: imageResult.totalCost
-    });
+    };
+
+    // Log response summary for debugging  
+    console.log(`[GENERATE-ADVENTURE] ✅ Sending response to frontend:`);
+    console.log(`[GENERATE-ADVENTURE] - Title: "${responseData.title || 'NO TITLE'}"`);
+    console.log(`[GENERATE-ADVENTURE] - Scenes: ${responseData.scenes?.length || 0}`);
+    console.log(`[GENERATE-ADVENTURE] - Monsters: ${responseData.monsters?.length || 0}`);
+    console.log(`[GENERATE-ADVENTURE] - Images: ${responseData.imageUrls?.length || 0}`);
+    console.log(`[GENERATE-ADVENTURE] - Image Errors: ${responseData.imageErrors?.length || 0}`);
+    console.log(`[GENERATE-ADVENTURE] - Adventure ID: ${responseData.id}`);
+    
+    // Mark as complete
+    progressTracker.complete(adventureContent.title || 'Tu Nueva Aventura');
+    
+    res.json(responseData);
 
   } catch (error) {
-    console.error('[GENERATE-ADVENTURE] ERROR:', error);
+    console.error('[GENERATE-ADVENTURE] 🚨 ERROR:', error);
     
     // Log the error
     const userId = (req as any).user?.id;
@@ -1813,6 +1857,41 @@ app.get('/api/analytics/creator/:id', async (req, res) => {
   }
 });
 
+app.post('/api/export/pdf', authenticateToken, async (req, res) => {
+  try {
+    const { template, adventureId, data, title, style } = req.body;
+    const userId = (req as any).user.id;
+    const userTier = (req as any).user.subscription_tier;
+
+    // For "Reader" tier, check and consume download credits
+    if (userTier === 'reader') {
+      const magicCreditsService = new MagicCreditsService(pool);
+      const canDownload = await magicCreditsService.canUserDownload(userId);
+      if (!canDownload) {
+        return res.status(403).json({
+          error: 'Download limit reached for your tier. Upgrade to get more downloads.',
+          upgradePrompt: magicCreditsService.getUpgradePrompt(userTier, 'downloads')
+        });
+      }
+      await magicCreditsService.consumeDownload(userId, adventureId);
+      logBusinessEvent({ event: 'pdf_download_consumed', userId, details: { adventureId } });
+    }
+
+    const pdfService = new PDFService();
+    const pdfBuffer = await pdfService.generatePDF(template, data, { title, style });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+    res.send(pdfBuffer);
+
+    logBusinessEvent({ event: 'pdf_download_success', userId, details: { adventureId, tier: userTier } });
+
+  } catch (error) {
+    logger.error({ error: error.message, stack: error.stack }, 'PDF Export Error');
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
 // Community leaderboard
 app.get('/api/analytics/leaderboard', async (req, res) => {
   try {
@@ -2093,6 +2172,91 @@ app.patch('/api/admin/fal-models/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Test Fal.ai model endpoint
+app.post('/api/admin/test-fal-model', authenticateToken, async (req, res) => {
+  try {
+    const { model_name } = req.body;
+    
+    if (!model_name) {
+      return res.status(400).json({ error: 'Model name is required' });
+    }
+    
+    console.log(`🖼️ Testing Fal.ai model: ${model_name}`);
+    
+    const startTime = Date.now();
+    
+    try {
+      // Real test - check if Fal.ai API key is configured
+      const falApiKey = process.env.FAL_API_KEY;
+      
+      if (!falApiKey) {
+        return res.json({
+          success: false,
+          error: 'Fal.ai API key not configured',
+          model_name
+        });
+      }
+      
+      // Test with a simple request to Fal.ai
+      const testResponse = await fetch(`https://fal.run/${model_name}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Key ${falApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          prompt: 'A simple test image of a red apple',
+          image_size: 'square_hd',
+          num_inference_steps: 4,
+          num_images: 1
+        })
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (testResponse.ok) {
+        const result = await testResponse.json();
+        
+        console.log(`✅ Fal.ai test successful for ${model_name} (${responseTime}ms)`);
+        
+        res.json({
+          success: true,
+          message: `Real test completed for model: ${model_name}`,
+          model_name,
+          test_result: 'Model is accessible and responding',
+          response_time: responseTime,
+          image_url: result.images?.[0]?.url || null
+        });
+      } else {
+        const errorText = await testResponse.text();
+        console.log(`❌ Fal.ai test failed for ${model_name}: ${testResponse.status}`);
+        
+        res.json({
+          success: false,
+          error: `Fal.ai API error: ${testResponse.status} - ${errorText}`,
+          model_name,
+          response_time: responseTime
+        });
+      }
+      
+    } catch (testError) {
+      const responseTime = Date.now() - startTime;
+      console.error('❌ Fal.ai test error:', testError);
+      
+      res.json({
+        success: false,
+        error: testError.message || 'Failed to test Fal.ai model',
+        model_name,
+        response_time: responseTime
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error testing Fal.ai model:', error);
+    res.status(500).json({ error: 'Failed to test Fal.ai model' });
+  }
+});
+
 app.get('/api/admin/image-config', authenticateToken, async (req, res) => {
   try {
     const { rows } = await query(`
@@ -2159,6 +2323,198 @@ app.patch('/api/admin/image-config', authenticateToken, async (req, res) => {
   }
 });
 
+
+// Admin routes for users
+app.get('/api/admin/users', authenticateToken, async (req, res) => {
+  try {
+    const { rows: users } = await query(`
+      SELECT id, email, username, tier, subscription_tier, magic_credits, credits_used, 
+             downloads_used, created_at, updated_at, subscription_status
+      FROM users 
+      ORDER BY created_at DESC
+    `);
+    
+    res.json({ users });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Admin routes for prompt logs
+app.get('/api/admin/prompt-logs', authenticateToken, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const { rows: logs } = await query(`
+      SELECT pl.*, u.email as user_email
+      FROM prompt_logs pl
+      LEFT JOIN users u ON pl.user_id = u.id
+      ORDER BY pl.created_at DESC
+      LIMIT $1
+    `, [limit]);
+    
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching prompt logs:', error);
+    res.status(500).json({ error: 'Failed to fetch prompt logs' });
+  }
+});
+
+// Clear prompt logs endpoint
+app.delete('/api/admin/clear-prompt-logs', authenticateToken, async (req, res) => {
+  try {
+    console.log('🗑️ Clearing all prompt logs...');
+    
+    // Get count before deletion
+    const { rows: countResult } = await query('SELECT COUNT(*) as count FROM prompt_logs');
+    const totalLogs = parseInt(countResult[0].count);
+    
+    // Delete all logs
+    await query('DELETE FROM prompt_logs');
+    
+    console.log(`✅ Cleared ${totalLogs} prompt logs`);
+    
+    res.json({ 
+      success: true, 
+      deletedCount: totalLogs,
+      message: `Successfully cleared ${totalLogs} prompt logs`
+    });
+    
+  } catch (error) {
+    console.error('❌ Error clearing prompt logs:', error);
+    res.status(500).json({ error: 'Failed to clear prompt logs' });
+  }
+});
+
+// Manual cleanup endpoint
+app.post('/api/admin/cleanup-logs', authenticateToken, async (req, res) => {
+  try {
+    console.log('🧹 Manual log cleanup requested...');
+    
+    const result = await logCleanupService.manualCleanup();
+    
+    res.json({
+      success: true,
+      ...result,
+      message: `Manual cleanup completed. Deleted ${result.deletedCount} logs.`
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in manual cleanup:', error);
+    res.status(500).json({ error: 'Failed to perform manual cleanup' });
+  }
+});
+
+// Log statistics endpoint
+app.get('/api/admin/log-stats', authenticateToken, async (req, res) => {
+  try {
+    const stats = await logCleanupService.getLogStats();
+    res.json({ stats });
+  } catch (error) {
+    console.error('Error fetching log stats:', error);
+    res.status(500).json({ error: 'Failed to fetch log statistics' });
+  }
+});
+
+// Admin routes for usage stats
+app.get('/api/admin/stats/usage', authenticateToken, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days as string) || 7;
+    const { rows: stats } = await query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as count,
+        SUM(CASE WHEN success THEN 1 ELSE 0 END) as successful_requests,
+        AVG(response_time_ms) as avg_response_time
+      FROM prompt_logs 
+      WHERE created_at >= NOW() - INTERVAL '${days} days'
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+    `);
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching usage stats:', error);
+    res.status(500).json({ error: 'Failed to fetch usage stats' });
+  }
+});
+
+// Admin routes for invite codes
+app.get('/api/admin/invite-codes', authenticateToken, async (req, res) => {
+  try {
+    const { rows: codes } = await query(`
+      SELECT id, code, max_uses, current_uses, expires_at, created_at, is_active
+      FROM invite_codes 
+      ORDER BY created_at DESC
+    `);
+    
+    res.json({ codes });
+  } catch (error) {
+    console.error('Error fetching invite codes:', error);
+    res.status(500).json({ error: 'Failed to fetch invite codes' });
+  }
+});
+
+app.post('/api/admin/invite-codes', authenticateToken, async (req, res) => {
+  try {
+    const { max_uses = 1, expires_in_days = 30 } = req.body;
+    
+    // Generate random code
+    const code = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const expires_at = new Date();
+    expires_at.setDate(expires_at.getDate() + expires_in_days);
+    
+    const { rows } = await query(`
+      INSERT INTO invite_codes (code, max_uses, expires_at, is_active)
+      VALUES ($1, $2, $3, true)
+      RETURNING *
+    `, [code, max_uses, expires_at]);
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error creating invite code:', error);
+    res.status(500).json({ error: 'Failed to create invite code' });
+  }
+});
+
+// Admin routes for image providers (placeholder)
+app.get('/api/admin/image-providers', authenticateToken, async (req, res) => {
+  try {
+    // For now, return Fal.ai as the main provider
+    const providers = [
+      {
+        id: 'fal-ai',
+        name: 'Fal.ai',
+        provider_type: 'fal',
+        is_active: true,
+        priority: 1
+      }
+    ];
+    
+    res.json({ providers });
+  } catch (error) {
+    console.error('Error fetching image providers:', error);
+    res.status(500).json({ error: 'Failed to fetch image providers' });
+  }
+});
+
+// Admin routes for image models (placeholder)
+app.get('/api/admin/image-models', authenticateToken, async (req, res) => {
+  try {
+    // Return Fal models from existing endpoint
+    const { rows: models } = await query(`
+      SELECT id, model_id as model_name, display_name, is_active, pricing_per_megapixel as cost_per_image
+      FROM fal_models 
+      ORDER BY display_name ASC
+    `);
+    
+    res.json({ models });
+  } catch (error) {
+    console.error('Error fetching image models:', error);
+    res.status(500).json({ error: 'Failed to fetch image models' });
+  }
+});
+
 // Get system configuration (admin only)
 app.get('/api/admin/config', authenticateToken, async (req, res) => {
   try {
@@ -2207,7 +2563,7 @@ interface NarrativeContext {
 
 
 
-async function generateImages(adventure: any, userId: string): Promise<{
+async function generateImages(adventure: any, userId: string, progressTracker?: AdventureProgressTracker): Promise<{
   imageUrls: string[];
   totalCost: number;
   errors: string[];
@@ -2216,7 +2572,7 @@ async function generateImages(adventure: any, userId: string): Promise<{
   await imageService.initialize();
   
   console.log('🖼️  Starting advanced image generation...');
-  const result = await imageService.generateAdventureImages(adventure, userId);
+  const result = await imageService.generateAdventureImages(adventure, userId, progressTracker);
   
   console.log(`🖼️  Generated ${result.imageUrls.length} images with ${result.errors.length} errors`);
   if (result.errors.length > 0) {
@@ -2911,7 +3267,7 @@ Make the puzzle engaging, fair, and solvable through logic and creativity. Inclu
 }
 
 // FIXED generateAdventure function - Addresses all critical feedback issues
-async function generateAdventure(llmService: LLMServiceV2, prompt: string, gameSystem: string, professionalMode?: any) {
+async function generateAdventure(llmService: LLMServiceV2, prompt: string, gameSystem: string, professionalMode?: any, progressTracker?: AdventureProgressTracker) {
   console.log(`[ADVENTURE-GEN] Starting generation with prompt: "${prompt.substring(0, 100)}..."`);
   console.log(`[ADVENTURE-GEN] Game System: ${gameSystem}`);
   console.log(`[ADVENTURE-GEN] Professional Mode: ${professionalMode?.enabled ? 'ENABLED' : 'DISABLED'}`);
@@ -3124,8 +3480,18 @@ IMPORTANT: Respond ONLY with valid JSON in the required structure. Do not includ
     
     console.log(`[ADVENTURE-GEN] System message: ${systemMessage}`);
     
+    // Update progress - generating scenes and NPCs
+    if (progressTracker) {
+      progressTracker.generatingScenes();
+    }
+    
     // Call LLM service with tool-based structured generation
     const result = await llmService.generateAdventure(adventurePrompt, systemMessage);
+    
+    // Update progress - generating monsters
+    if (progressTracker) {
+      progressTracker.generatingMonsters();
+    }
 
     console.log(`[ADVENTURE-GEN] LLM response received using tool calling`);
     console.log(`[ADVENTURE-GEN] Adventure title: ${result?.title || 'No title'}`);
@@ -3145,6 +3511,9 @@ IMPORTANT: Respond ONLY with valid JSON in the required structure. Do not includ
     // Apply professional mode enhancements if enabled
     if (professionalMode?.enabled) {
       console.log(`[ADVENTURE-GEN] Applying professional mode enhancements...`);
+      if (progressTracker) {
+        progressTracker.applyingEnhancements();
+      }
       try {
         // Import quality validation
         const { validateAdventureQuality } = await import('./enhanced-adventure-prompt.js');
@@ -3215,11 +3584,34 @@ IMPORTANT: Respond ONLY with valid JSON in the required structure. Do not includ
   }
 }
 
+// Import log cleanup service
+import { logCleanupService } from './log-cleanup-service.ts';
+import { LLMService } from './llm-service.js';
+import { LLMService } from './llm-service.js';
+import { LLMService } from './llm-service.js';
+import { LLMService } from './llm-service.js';
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 Client connected: ${socket.id}`);
+  
+  socket.on('disconnect', () => {
+    console.log(`🔌 Client disconnected: ${socket.id}`);
+  });
+  
+  socket.on('join-adventure-generation', (data) => {
+    socket.join(`adventure-${data.userId}`);
+    console.log(`🎲 Client joined adventure generation room: ${data.userId}`);
+  });
+});
+
 // Start server
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`🚀 Express server running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🧹 Log cleanup service started - automatic cleanup every 24h`);
+    console.log(`🔌 Socket.IO server initialized`);
   });
 }
 

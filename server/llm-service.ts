@@ -570,7 +570,7 @@ export class LLMService {
   private getImageEndpoint(providerType: string, baseUrl: string): string {
     switch (providerType) {
       case 'fal_ai':
-        return 'https://fal.run/fal-ai/fast-sdxl';
+        return 'https://fal.run/fast-sdxl';
       case 'openai':
         return `${baseUrl}/images/generations`;
       case 'stability':
@@ -582,11 +582,11 @@ export class LLMService {
 
   private getFalAiModelEndpoint(modelName: string): string {
     if (modelName.includes('flux-dev')) {
-      return 'https://fal.run/fal-ai/flux/dev';
+      return 'https://fal.run/flux/dev';
     } else if (modelName.includes('flux')) {
-      return 'https://fal.run/fal-ai/flux';
+      return 'https://fal.run/flux';
     } else {
-      return 'https://fal.run/fal-ai/fast-sdxl';
+      return 'https://fal.run/fast-sdxl';
     }
   }
 

@@ -139,6 +139,7 @@ interface InviteCode {
 export default function Admin() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [clearingLogs, setClearingLogs] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Data states
@@ -262,11 +263,26 @@ export default function Admin() {
         const usersData = await usersRes.json();
         setUsers(usersData.users || []);
       }
-      if (providersRes.ok) setLlmProviders(await providersRes.json());
-      if (modelsRes.ok) setLlmModels(await modelsRes.json());
-      if (imageProvidersRes.ok) setImageProviders(await imageProvidersRes.json());
-      if (imageModelsRes.ok) setImageModels(await imageModelsRes.json());
-      if (inviteCodesRes.ok) setInviteCodes(await inviteCodesRes.json());
+      if (providersRes.ok) {
+        const providersData = await providersRes.json();
+        setLlmProviders(providersData.providers || []);
+      }
+      if (modelsRes.ok) {
+        const modelsData = await modelsRes.json();
+        setLlmModels(modelsData.models || []);
+      }
+      if (imageProvidersRes.ok) {
+        const imageProvidersData = await imageProvidersRes.json();
+        setImageProviders(Array.isArray(imageProvidersData) ? imageProvidersData : imageProvidersData.providers || []);
+      }
+      if (imageModelsRes.ok) {
+        const imageModelsData = await imageModelsRes.json();
+        setImageModels(Array.isArray(imageModelsData) ? imageModelsData : imageModelsData.models || []);
+      }
+      if (inviteCodesRes.ok) {
+        const inviteCodesData = await inviteCodesRes.json();
+        setInviteCodes(Array.isArray(inviteCodesData) ? inviteCodesData : inviteCodesData.codes || []);
+      }
       
       if (promptLogsRes.ok) {
         const logsData = await promptLogsRes.json();
@@ -276,18 +292,18 @@ export default function Admin() {
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         // Calculate system stats from logs data
-        const totalRequests = statsData.reduce((sum: number, stat: any) => sum + stat.count, 0);
-        const totalTokens = statsData.reduce((sum: number, stat: any) => sum + stat.total_tokens, 0);
-        const totalCost = statsData.reduce((sum: number, stat: any) => sum + stat.total_cost, 0);
-        const avgResponseTime = statsData.reduce((sum: number, stat: any) => sum + stat.avg_response_time, 0) / statsData.length;
-        const successCount = statsData.reduce((sum: number, stat: any) => sum + stat.success_count, 0);
+        const totalRequests = Array.isArray(statsData) ? statsData.reduce((sum: number, stat: any) => sum + (stat.count || 0), 0) : 0;
+        const avgResponseTime = Array.isArray(statsData) && statsData.length > 0 
+          ? statsData.reduce((sum: number, stat: any) => sum + (stat.avg_response_time || 0), 0) / statsData.length 
+          : 0;
+        const successfulRequests = Array.isArray(statsData) ? statsData.reduce((sum: number, stat: any) => sum + (stat.successful_requests || 0), 0) : 0;
         
         setSystemStats({
           totalRequests,
-          successRate: totalRequests > 0 ? (successCount / totalRequests) * 100 : 0,
+          successRate: totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0,
           avgResponseTime: avgResponseTime || 0,
-          totalCost,
-          totalTokens
+          totalCost: 0, // Will be calculated from actual cost data later
+          totalTokens: 0 // Will be calculated from actual token data later
         });
       }
 
@@ -665,6 +681,45 @@ export default function Admin() {
     }
   };
 
+  // Prompt Logs Management
+  const clearPromptLogs = async () => {
+    if (!confirm('¿Estás seguro de que quieres eliminar todos los logs? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      setClearingLogs(true);
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch('/api/admin/clear-prompt-logs', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPromptLogs([]);
+        toast.success(`Eliminados ${data.deletedCount} logs exitosamente`);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to clear logs');
+      }
+    } catch (error: any) {
+      console.error('Error clearing logs:', error);
+      toast.error(error.message || 'Failed to clear logs');
+    } finally {
+      setClearingLogs(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -700,14 +755,15 @@ export default function Admin() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Settings className="h-8 w-8" />
-          Admin Control Panel
-        </h1>
-        <p className="text-muted-foreground">Complete system management and configuration</p>
-      </div>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-foreground">
+            <Settings className="h-8 w-8" />
+            Admin Control Panel
+          </h1>
+          <p className="text-muted-foreground">Complete system management and configuration</p>
+        </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
@@ -822,13 +878,13 @@ export default function Admin() {
                 <div>
                   <div className="flex justify-between text-sm mb-2">
                     <span>LLM Providers</span>
-                    <span>{llmProviders.filter(p => p.is_active).length}/{llmProviders.length}</span>
+                    <span>{Array.isArray(llmProviders) ? llmProviders.filter(p => p.is_active).length : 0}/{Array.isArray(llmProviders) ? llmProviders.length : 0}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-600 h-2 rounded-full" 
                       style={{ 
-                        width: `${llmProviders.length > 0 ? (llmProviders.filter(p => p.is_active).length / llmProviders.length) * 100 : 0}%` 
+                        width: `${Array.isArray(llmProviders) && llmProviders.length > 0 ? (llmProviders.filter(p => p.is_active).length / llmProviders.length) * 100 : 0}%` 
                       }}
                     ></div>
                   </div>
@@ -1103,7 +1159,7 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {llmProviders.map((provider) => (
+                {Array.isArray(llmProviders) ? llmProviders.map((provider) => (
                   <div key={provider.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <input
@@ -1182,7 +1238,7 @@ export default function Admin() {
                       </Badge>
                     </div>
                   </div>
-                ))}
+                )) : null}
               </div>
             </CardContent>
           </Card>
@@ -1243,12 +1299,31 @@ export default function Admin() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle>Prompt Logs</CardTitle>
-                  <CardDescription>Real-time system logs and API interactions</CardDescription>
+                  <CardDescription>
+                    Real-time system logs and API interactions
+                    <br />
+                    <span className="text-xs text-muted-foreground">
+                      🧹 Auto-cleanup: Every 24h | Keeps last 7 days or max 10,000 logs
+                    </span>
+                  </CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={fetchData}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={clearPromptLogs}
+                    disabled={clearingLogs}
+                  >
+                    {clearingLogs ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    {clearingLogs ? 'Clearing...' : 'Clear All'}
                   </Button>
                   <Button variant="outline" size="sm">
                     <Download className="h-4 w-4 mr-2" />
@@ -1591,6 +1666,7 @@ export default function Admin() {
           </DialogContent>
         </Dialog>
       )}
+      </div>
     </div>
   );
 }

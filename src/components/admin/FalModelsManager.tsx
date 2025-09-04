@@ -166,7 +166,7 @@ export default function FalModelsManager() {
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify({ 
-          model_id: model.model_id
+          model_name: model.model_id
         })
       });
 
@@ -207,12 +207,12 @@ export default function FalModelsManager() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-card rounded-lg shadow p-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-6 bg-muted rounded w-1/4 mb-4"></div>
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+              <div key={i} className="h-16 bg-muted rounded"></div>
             ))}
           </div>
         </div>
@@ -223,21 +223,21 @@ export default function FalModelsManager() {
   return (
     <div className="space-y-6">
       {/* Configuration Section */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-card rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-foreground mb-4">
           🎨 Image Generation Configuration
         </h3>
         
         {config && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Default Model
               </label>
               <select
                 value={config.default_model_id}
                 onChange={(e) => updateConfig({ default_model_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 disabled={saving}
               >
                 {models.filter(m => m.is_active).map(model => (
@@ -249,13 +249,13 @@ export default function FalModelsManager() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Default Resolution
               </label>
               <select
                 value={config.default_resolution}
                 onChange={(e) => updateConfig({ default_resolution: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 disabled={saving}
               >
                 <option value="512x512">512x512 (0.26 MP)</option>
@@ -267,7 +267,7 @@ export default function FalModelsManager() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Max Images per Adventure
               </label>
               <input
@@ -276,13 +276,13 @@ export default function FalModelsManager() {
                 max="50"
                 value={config.max_images_per_adventure}
                 onChange={(e) => updateConfig({ max_images_per_adventure: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 disabled={saving}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Pricing Multiplier
               </label>
               <input
@@ -292,7 +292,7 @@ export default function FalModelsManager() {
                 step="0.1"
                 value={config.pricing_multiplier}
                 onChange={(e) => updateConfig({ pricing_multiplier: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 disabled={saving}
               />
             </div>
@@ -308,7 +308,7 @@ export default function FalModelsManager() {
               className="mr-2"
               disabled={saving}
             />
-            <span className="text-sm text-gray-700">Enable Image-to-Image</span>
+            <span className="text-sm text-foreground">Enable Image-to-Image</span>
           </label>
 
           <label className="flex items-center">
@@ -319,7 +319,7 @@ export default function FalModelsManager() {
               className="mr-2"
               disabled={saving}
             />
-            <span className="text-sm text-gray-700">Enable Inpainting</span>
+            <span className="text-sm text-foreground">Enable Inpainting</span>
           </label>
 
           <label className="flex items-center">
@@ -330,14 +330,14 @@ export default function FalModelsManager() {
               className="mr-2"
               disabled={saving}
             />
-            <span className="text-sm text-gray-700">Enable Outpainting</span>
+            <span className="text-sm text-foreground">Enable Outpainting</span>
           </label>
         </div>
       </div>
 
       {/* Models Section */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-card rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-foreground mb-4">
           🖼️ Fal.ai Image Models
         </h3>
 
@@ -352,24 +352,24 @@ export default function FalModelsManager() {
             <div
               key={model.id}
               className={`p-4 border rounded-lg ${
-                model.is_active ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                model.is_active ? 'border-green-500/20 bg-green-500/10' : 'border-border bg-card'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
-                    <h4 className="font-medium text-gray-900">{model.display_name}</h4>
-                    <span className="text-sm text-gray-500">({model.model_id})</span>
+                    <h4 className="font-medium text-foreground">{model.display_name}</h4>
+                    <span className="text-sm text-muted-foreground">({model.model_id})</span>
                     <span className={`px-2 py-1 text-xs rounded-full ${
-                      model.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      model.is_active ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-muted text-muted-foreground'
                     }`}>
                       {model.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                   
-                  <p className="text-sm text-gray-600 mt-1">{model.description}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{model.description}</p>
                   
-                  <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                  <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
                     <span>💰 ${model.pricing_per_megapixel}/MP</span>
                     <span>📐 {model.max_resolution}</span>
                     <span>💵 {formatPrice(model.pricing_per_megapixel, model.max_resolution)} per image</span>
@@ -391,8 +391,8 @@ export default function FalModelsManager() {
                   {testResults[model.id] && (
                     <div className={`mt-3 p-3 rounded-lg ${
                       testResults[model.id].success 
-                        ? 'bg-green-50 border border-green-200' 
-                        : 'bg-red-50 border border-red-200'
+                        ? 'bg-green-500/10 border border-green-500/20' 
+                        : 'bg-red-500/10 border border-red-500/20'
                     }`}>
                       {testResults[model.id].success ? (
                         <div>
@@ -429,8 +429,8 @@ export default function FalModelsManager() {
                     disabled={!model.is_active || testing === model.id}
                     className={`px-3 py-1 text-sm rounded-md transition-colors flex items-center gap-1 ${
                       model.is_active
-                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:text-blue-400'
+                        : 'bg-muted text-muted-foreground cursor-not-allowed'
                     } ${testing === model.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {testing === model.id ? (
@@ -463,7 +463,7 @@ export default function FalModelsManager() {
         </div>
 
         {models.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             <p>No Fal.ai models found. Run the update script to add models.</p>
           </div>
         )}
