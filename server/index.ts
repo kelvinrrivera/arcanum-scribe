@@ -857,8 +857,8 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
 
     // Save to database with privacy setting
     const { rows: adventures } = await query(`
-      INSERT INTO adventures (user_id, title, content, game_system, privacy, tags)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO adventures (user_id, title, content, game_system, privacy, tags, image_urls, image_generation_cost, regenerations_used)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
       userId, 
@@ -877,7 +877,10 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
       }), 
       gameSystem,
       finalPrivacy,
-      req.body.themes || []
+      req.body.themes || [],
+      imageResult.imageUrls,
+      imageResult.totalCost,
+      0
     ]);
 
     const adventure = adventures[0];
@@ -888,13 +891,17 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
     const responseData = {
       // Flatten the adventure content to the top level for frontend compatibility
       ...adventureContent,
+      // Also include as nested content for robust frontend mapping
+      content: adventureContent,
       // Add database info
       id: adventure.id,
       userId: adventure.user_id,
       privacy: adventure.privacy,
       createdAt: adventure.created_at,
+      created_at: adventure.created_at,
       // Add image info
       imageUrls: imageResult.imageUrls,
+      image_urls: imageResult.imageUrls,
       imageErrors: imageResult.errors,
       imageCost: imageResult.totalCost
     };
@@ -1975,9 +1982,35 @@ app.get('/api/adventure/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Adventure not found' });
     }
 
-    console.log(`[NEW-ADVENTURE-BY-ID] Returning adventure: ${rows[0].title}`);
-    console.log(`[NEW-ADVENTURE-BY-ID] Image URLs: ${rows[0].image_urls?.length || 0}`);
-    res.json(rows[0]);
+    const adventure = rows[0];
+    // Normalize content: ensure object
+    try {
+      if (adventure && adventure.content && typeof adventure.content === 'string') {
+        adventure.content = JSON.parse(adventure.content);
+      }
+    } catch (e) {
+      console.warn('[NEW-ADVENTURE-BY-ID] Failed to parse content JSON, leaving as-is');
+    }
+
+    // Backfill top-level title if missing
+    if (!adventure.title && adventure.content && adventure.content.title) {
+      adventure.title = adventure.content.title;
+    }
+
+    // Normalize image URLs: prefer column, fallback to content.images
+    if (!Array.isArray(adventure.image_urls) || adventure.image_urls.length === 0) {
+      const contentImages = (adventure.content && Array.isArray(adventure.content.images)) ? adventure.content.images : [];
+      const extracted = contentImages
+        .map((img: any) => (typeof img === 'string' ? img : img?.url))
+        .filter((u: any) => typeof u === 'string' && u.length > 0);
+      if (extracted.length > 0) {
+        adventure.image_urls = extracted;
+      }
+    }
+
+    console.log(`[NEW-ADVENTURE-BY-ID] Returning adventure: ${adventure.title}`);
+    console.log(`[NEW-ADVENTURE-BY-ID] Image URLs: ${adventure.image_urls?.length || 0}`);
+    res.json(adventure);
   } catch (error) {
     console.error('[NEW-ADVENTURE-BY-ID] ERROR:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });

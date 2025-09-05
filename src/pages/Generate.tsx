@@ -214,7 +214,13 @@ export default function Generate() {
         }
 
         const sessionKey = `adventure_${adventureId}`;
-        const adventureData = result;
+        const adventureData = {
+          ...result,
+          // Normalize fields for AdventureView robustness
+          content: result.content || result,
+          image_urls: result.image_urls || result.imageUrls || [],
+          created_at: result.created_at || result.createdAt || new Date().toISOString(),
+        };
 
         try {
           sessionStorage.setItem(sessionKey, JSON.stringify(adventureData));
