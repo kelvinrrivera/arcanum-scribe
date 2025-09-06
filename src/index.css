@@ -5,6 +5,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Landing Page Specific Styles */
+@import './styles/landing-page.css';
+
+/* Mobile Touch Optimization Styles */
+@import './styles/mobile-touch.css';
+
 /* Adventure Progress Animations */
 @keyframes shimmer {
   0% { transform: translateX(-100%); }

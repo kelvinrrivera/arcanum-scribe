@@ -11,6 +11,7 @@ import { query, transaction } from '../src/integrations/postgres/client';
 import { LLMServiceV2 } from './llm-service-v2';
 import { ImageService } from './image-service';
 import { PDFService } from './pdf-service';
+import { ProfessionalPDFService } from './pdf-service-professional';
 import { TierService } from './tier-service';
 import { GalleryService } from './gallery-service';
 import { cacheService } from './cache-service';
@@ -48,6 +49,21 @@ const io = new SocketIOServer(server, {
     origin: process.env.FRONTEND_URL || "http://localhost:8080",
     methods: ["GET", "POST"]
   }
+});
+
+// CRITICAL FIX: Socket.IO room management for adventure generation
+io.on('connection', (socket) => {
+  console.log(`[SOCKET.IO] Client connected: ${socket.id}`);
+  
+  socket.on('join-adventure-generation', ({ userId }) => {
+    const roomName = `adventure-${userId}`;
+    socket.join(roomName);
+    console.log(`[SOCKET.IO] User ${userId} joined room: ${roomName}`);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log(`[SOCKET.IO] Client disconnected: ${socket.id}`);
+  });
 });
 const PORT = process.env.PORT || 3000;
 
@@ -134,6 +150,90 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
+});
+
+// TEST ENDPOINT - COMPLETELY PUBLIC
+app.get('/test/public', (req, res) => {
+  res.json({ message: 'This works without auth', timestamp: new Date().toISOString() });
+});
+
+// TEST DB ENDPOINT
+app.get('/test/db', async (req, res) => {
+  try {
+    console.log('[TEST-DB] Testing database connection...');
+    const { rows } = await query('SELECT COUNT(*) as count FROM adventures WHERE privacy = $1', ['public']);
+    console.log('[TEST-DB] Query result:', rows[0]);
+    res.json({ 
+      message: 'Database connection works', 
+      publicAdventures: rows[0].count,
+      timestamp: new Date().toISOString() 
+    });
+  } catch (error) {
+    console.error('[TEST-DB] ERROR:', error);
+    res.status(500).json({ 
+      error: 'Database error', 
+      message: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// PUBLIC ENDPOINT - OUTSIDE /api TO AVOID AUTH MIDDLEWARE
+app.get('/public/adventures', async (req, res) => {
+  // Add CORS headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  console.log('[PUBLIC-ADVENTURES] Request received:', req.query);
+  
+  try {
+    const limit = parseInt(req.query.limit as string) || 12;
+    const filter = req.query.filter as string || 'recent';
+    
+    // Fixed ORDER BY to avoid SQL injection
+    let orderClause = 'created_at DESC';
+    if (filter === 'popular') {
+      orderClause = 'view_count DESC, created_at DESC';
+    } else if (filter === 'top-rated') {
+      orderClause = 'rating_count DESC, created_at DESC';
+    }
+    
+    console.log('[PUBLIC-ADVENTURES] Executing query with limit:', limit, 'filter:', filter);
+    
+    // Simplified query first
+    const queryText = `
+      SELECT id, title, game_system, created_at, privacy,
+             COALESCE(summary, '') as description,
+             COALESCE(view_count, 0) as view_count,
+             COALESCE(download_count, 0) as download_count,
+             COALESCE(rating_count, 0) as rating_count,
+             updated_at
+      FROM adventures 
+      WHERE privacy = 'public'
+      ORDER BY ${orderClause}
+      LIMIT $1
+    `;
+    
+    console.log('[PUBLIC-ADVENTURES] Query:', queryText);
+    
+    const { rows } = await query(queryText, [limit]);
+
+    console.log('[PUBLIC-ADVENTURES] Found', rows.length, 'adventures');
+    console.log('[PUBLIC-ADVENTURES] Sample row:', rows[0] ? {
+      id: rows[0].id,
+      title: rows[0].title,
+      privacy: rows[0].privacy
+    } : 'No rows');
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('[PUBLIC-ADVENTURES] ERROR:', error);
+    console.error('[PUBLIC-ADVENTURES] Stack:', error instanceof Error ? error.stack : 'No stack');
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
 });
 
 // Authentication endpoints
@@ -646,21 +746,7 @@ app.get('/api/users/:userId/profile', authenticateToken, async (req, res) => {
 });
 
 // Adventures endpoints
-app.get('/api/adventures', authenticateToken, async (req, res) => {
-  try {
-    const userId = (req as any).user.id;
-    
-    const { rows } = await query(
-      'SELECT id, title, content, game_system, created_at FROM adventures WHERE user_id = $1 ORDER BY created_at DESC',
-      [userId]
-    );
-
-    res.json(rows);
-  } catch (error) {
-    console.error('Get adventures error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// REMOVED: Duplicate endpoint - using the better one at line 1043+
 
 app.get('/api/adventures/:id', authenticateToken, async (req, res) => {
   try {
@@ -770,7 +856,14 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
     console.log(`[GENERATE-ADVENTURE] Professional mode: ${professionalMode?.enabled ? 'ENABLED' : 'DISABLED'}`);
     
     const startTime = Date.now();
-    const adventureContent = await generateAdventure(llmService, prompt, gameSystem, professionalMode, progressTracker);
+    let adventureContent;
+    try {
+      adventureContent = await generateAdventure(llmService, prompt, gameSystem, professionalMode, progressTracker);
+    } catch (generateError) {
+      console.error(`[GENERATE-ADVENTURE] Adventure generation failed:`, generateError);
+      progressTracker.error(`Adventure generation failed: ${generateError instanceof Error ? generateError.message : 'Unknown error'}`);
+      throw generateError;
+    }
     const endTime = Date.now();
     
     // Log the adventure generation
@@ -802,15 +895,15 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
       console.log(`[GENERATE-ADVENTURE] Adventure has ${adventureContent.monsters?.length || 0} monsters and ${adventureContent.magicItems?.length || 0} magic items`);
       console.log(`[GENERATE-ADVENTURE] User ID: ${userId}`);
 
-      const imageTimeoutMs = Number(process.env.IMAGE_GEN_TIMEOUT_MS || 360000); // Default 6 minutes
+      const imageTimeoutMs = Number(process.env.IMAGE_GEN_TIMEOUT_MS || 900000); // Default 15 minutes - much more reasonable
       console.log(`[GENERATE-ADVENTURE] Image generation timeout set to ${imageTimeoutMs}ms (${Math.round(imageTimeoutMs/1000)}s)`);
       
       const imageGenPromise = generateImages(adventureContent, userId, progressTracker);
       const timeoutPromise = new Promise<typeof imageResult>((resolve) => {
         setTimeout(() => {
-          console.log(`[GENERATE-ADVENTURE] ⚠️ Image generation timed out after ${imageTimeoutMs}ms. Proceeding without images.`);
-          console.log(`[GENERATE-ADVENTURE] This may indicate that image generation is taking longer than expected.`);
-          resolve({ imageUrls: [], totalCost: 0, errors: [`Image generation timed out after ${Math.round(imageTimeoutMs/1000)} seconds`] });
+          console.log(`[GENERATE-ADVENTURE] 🎨 Image generation taking longer than expected, proceeding with adventure content.`);
+          console.log(`[GENERATE-ADVENTURE] Images will continue generating in background if possible.`);
+          resolve({ imageUrls: [], totalCost: 0, errors: [`Image generation is taking longer than expected - adventure created without images`] });
         }, imageTimeoutMs);
       });
 
@@ -850,10 +943,8 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
 
     // Private adventures are handled by tier permissions, no slot consumption needed
 
-    // Get user tier info for default privacy
-    const tierInfo = await magicCreditsService.getUserTierInfo(userId);
-    const defaultPrivacy = tierInfo?.credits.canCreatePrivate ? 'private' : 'public';
-    const finalPrivacy = privacy || defaultPrivacy;
+    // Use the privacy setting from the request, which already has proper defaults
+    const finalPrivacy = privacy;
 
     // Save to database with privacy setting
     const { rows: adventures } = await query(`
@@ -923,9 +1014,12 @@ app.post('/api/generate-adventure', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[GENERATE-ADVENTURE] 🚨 ERROR:', error);
     
-    // Log the error
+    // CRITICAL FIX: Notify progress tracker of error
     const userId = (req as any).user?.id;
     if (userId) {
+      const progressTracker = new AdventureProgressTracker(io, userId);
+      progressTracker.error(error instanceof Error ? error.message : 'Unknown error occurred');
+      
       await loggingService.logPromptInteraction({
         user_id: userId,
         prompt_type: 'adventure',
@@ -968,22 +1062,43 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// REMOVED: Duplicate public endpoint (using the one moved to line 156)
+
 // Get user adventures
 app.get('/api/adventures', authenticateToken, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
+    
+    if (!userId) {
+      console.error('[ADVENTURES] No user ID found in token');
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    console.log('[ADVENTURES] Fetching adventures for user:', userId);
     
     const { rows } = await query(`
-      SELECT id, title, content, game_system, created_at, image_urls
+      SELECT id, title, content, game_system, created_at, image_urls, 
+             COALESCE(privacy, 'public') as privacy,
+             COALESCE(summary, '') as description,
+             COALESCE(view_count, 0) as view_count,
+             COALESCE(download_count, 0) as download_count,
+             COALESCE(rating_count, 0) as rating_count,
+             updated_at
       FROM adventures 
       WHERE user_id = $1
       ORDER BY created_at DESC
     `, [userId]);
 
+    console.log('[ADVENTURES] Found', rows.length, 'adventures for user', userId);
+    console.log('[ADVENTURES] Sample adventure privacy:', rows[0]?.privacy);
     res.json(rows);
   } catch (error) {
     console.error('[ADVENTURES] ERROR:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('[ADVENTURES] Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
@@ -1576,11 +1691,18 @@ app.post('/api/adventure/:id/privacy', authenticateToken, async (req, res) => {
     }
 
     // Update privacy
+    console.log(`[PRIVACY] Updating adventure ${adventureId} privacy from ${currentPrivacy} to ${privacy}`);
     await query(`
       UPDATE adventures 
       SET privacy = $1, updated_at = NOW()
       WHERE id = $2
     `, [privacy, adventureId]);
+    
+    // Verify the update
+    const { rows: verifyRows } = await query(`
+      SELECT privacy FROM adventures WHERE id = $1
+    `, [adventureId]);
+    console.log(`[PRIVACY] Verified privacy after update:`, verifyRows[0]?.privacy);
 
     // Private adventures are handled by tier permissions, no slot tracking needed
 
@@ -1866,36 +1988,528 @@ app.get('/api/analytics/creator/:id', async (req, res) => {
 
 app.post('/api/export/pdf', authenticateToken, async (req, res) => {
   try {
-    const { template, adventureId, data, title, style } = req.body;
+    const { template, adventureId, data, title, style, options } = req.body;
     const userId = (req as any).user.id;
     const userTier = (req as any).user.subscription_tier;
 
-    // For "Reader" tier, check and consume download credits
-    if (userTier === 'reader') {
-      const magicCreditsService = new MagicCreditsService(pool);
-      const canDownload = await magicCreditsService.canUserDownload(userId);
-      if (!canDownload) {
-        return res.status(403).json({
-          error: 'Download limit reached for your tier. Upgrade to get more downloads.',
-          upgradePrompt: magicCreditsService.getUpgradePrompt(userTier, 'downloads')
-        });
-      }
-      await magicCreditsService.consumeDownload(userId, adventureId);
-      logBusinessEvent({ event: 'pdf_download_consumed', userId, details: { adventureId } });
+    console.log(`[PDF-EXPORT] User ${userId} (${userTier}) requesting PDF export`);
+    console.log(`[PDF-EXPORT] Request body:`, { template, adventureId, data: !!data, title, style, options });
+
+    // Prepare PDF generation options
+    const pdfOptions = {
+      template: style || 'classic',
+      format: options?.format || 'A4',
+      includeImages: options?.includeImages !== false,
+      includeStatBlocks: options?.includeStatBlocks !== false,
+      watermark: false
+    };
+
+    // Validate template type
+    const validTemplates = ['adventure-masterpiece', 'full-adventure', 'monster-card', 'magic-item-card', 'spell-card', 'npc-portfolio'];
+    if (!validTemplates.includes(template)) {
+      return res.status(400).json({ error: 'Invalid template type' });
     }
 
+    // Validate style type
+    const validStyles = ['classic', 'gothic', 'mystical', 'arcane'];
+    const selectedStyle = style && validStyles.includes(style) ? style : 'classic';
+
+    let exportData = data;
+
+    // If adventureId is provided, fetch the adventure from database
+    if (adventureId) {
+      const { rows } = await query(`
+        SELECT id, title, content, game_system, image_urls 
+        FROM adventures 
+        WHERE id = $1 AND user_id = $2
+      `, [adventureId, userId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Adventure not found' });
+      }
+
+      const adventure = rows[0];
+      exportData = {
+        ...adventure.content,
+        title: adventure.title,
+        game_system: adventure.game_system,
+        image_urls: adventure.image_urls || []
+      };
+    }
+
+    if (!exportData) {
+      return res.status(400).json({ error: 'No data provided for export' });
+    }
+
+    const adventureTitle = title || exportData.title || 'Untitled Adventure';
+    
+    // Generate HTML content using existing PDF service
     const pdfService = new PDFService();
-    const pdfBuffer = await pdfService.generatePDF(template, data, { title, style });
+    let htmlContent;
+    
+    try {
+      // Access the private generateHTML method by creating a temporary instance
+      htmlContent = await (pdfService as any).generateHTML({
+        template: template as 'adventure-masterpiece' | 'full-adventure' | 'monster-card' | 'magic-item-card' | 'spell-card' | 'npc-portfolio',
+        data: exportData,
+        title: adventureTitle,
+        style: selectedStyle
+      });
+    } catch (htmlError) {
+      console.error('[PDF-EXPORT] Error generating HTML:', htmlError);
+      return res.status(500).json({ error: 'Failed to prepare content for PDF generation' });
+    }
 
+    // Use dual PDF system based on tier
+    const professionalPdfService = new ProfessionalPDFService(pool);
+    let pdfResult;
+
+    if (userTier === 'reader') {
+      // Free tier gets watermarked preview
+      console.log(`[PDF-EXPORT] Generating preview PDF with watermark for reader tier`);
+      pdfResult = await professionalPdfService.generatePreviewPDF(htmlContent, pdfOptions, adventureTitle);
+    } else {
+      // Paid tiers get professional PDF with credit consumption
+      console.log(`[PDF-EXPORT] Generating professional PDF for ${userTier} tier`);
+      pdfResult = await professionalPdfService.generateProfessionalPDF(htmlContent, pdfOptions, userId, adventureTitle);
+    }
+
+    if (!pdfResult.success) {
+      return res.status(400).json({ 
+        error: pdfResult.error,
+        upgradePrompt: userTier === 'reader' ? 'Upgrade to Creator for professional PDFs without watermarks' : undefined
+      });
+    }
+
+    // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
-    res.send(pdfBuffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${adventureTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+    res.setHeader('Content-Length', pdfResult.buffer!.length);
 
-    logBusinessEvent({ event: 'pdf_download_success', userId, details: { adventureId, tier: userTier } });
+    // Send PDF
+    res.end(pdfResult.buffer);
+
+    logBusinessEvent({ 
+      event: pdfResult.isPreview ? 'pdf_preview_success' : 'pdf_professional_success', 
+      userId, 
+      details: { 
+        adventureId, 
+        tier: userTier,
+        creditsUsed: pdfResult.creditsUsed || 0,
+        isPreview: pdfResult.isPreview || false
+      } 
+    });
+
+    console.log(`[PDF-EXPORT] ✅ ${pdfResult.isPreview ? 'Preview' : 'Professional'} PDF generated successfully`);
 
   } catch (error) {
     logger.error({ error: error.message, stack: error.stack }, 'PDF Export Error');
     res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
+/**
+ * Add print-optimized CSS and watermark for PDF preview
+ */
+function addPrintPreviewStyles(htmlContent: string, adventureTitle: string, userTier: string): string {
+  const isFreeTier = userTier === 'reader';
+  
+  const printStyles = `
+    <style>
+      /* Print-optimized CSS for PDF preview */
+      @media print, screen {
+        body {
+          font-family: 'Georgia', 'Times New Roman', serif;
+          line-height: 1.6;
+          color: #333;
+          margin: 0;
+          padding: 20px;
+          max-width: 210mm; /* A4 width */
+        }
+        
+        /* Page breaks and layout */
+        .adventure-page {
+          page-break-after: always;
+          margin-bottom: 40px;
+        }
+        
+        .adventure-page:last-child {
+          page-break-after: avoid;
+        }
+        
+        /* Headings */
+        h1 {
+          font-size: 24px;
+          margin-top: 0;
+          margin-bottom: 20px;
+          color: #2c3e50;
+          border-bottom: 2px solid #2c3e50;
+          padding-bottom: 10px;
+        }
+        
+        h2 {
+          font-size: 18px;
+          margin-top: 30px;
+          margin-bottom: 15px;
+          color: #34495e;
+        }
+        
+        h3 {
+          font-size: 16px;
+          margin-top: 20px;
+          margin-bottom: 10px;
+          color: #34495e;
+        }
+        
+        /* Paragraphs and text */
+        p {
+          margin-bottom: 15px;
+          text-align: justify;
+        }
+        
+        /* Stat blocks and boxes */
+        .stat-block, .npc-block, .monster-block {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 15px;
+          margin: 15px 0;
+          background: #f9f9f9;
+          page-break-inside: avoid;
+        }
+        
+        /* Images */
+        img {
+          max-width: 100%;
+          height: auto;
+          margin: 15px 0;
+        }
+        
+        /* Lists */
+        ul, ol {
+          margin: 15px 0;
+          padding-left: 30px;
+        }
+        
+        /* Tables */
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 15px 0;
+        }
+        
+        table th, table td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        
+        table th {
+          background-color: #f2f2f2;
+        }
+        
+        /* Preview-specific styles */
+        .pdf-preview-header {
+          text-align: center;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 20px;
+          margin: -20px -20px 30px -20px;
+          border-radius: 8px 8px 0 0;
+        }
+        
+        .pdf-preview-actions {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 1000;
+          background: white;
+          padding: 15px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          border: 1px solid #ddd;
+        }
+        
+        .pdf-preview-actions button {
+          display: block;
+          width: 100%;
+          margin-bottom: 10px;
+          padding: 10px 15px;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        
+        .btn-professional {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+        }
+        
+        .btn-professional:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-print {
+          background: #27ae60;
+          color: white;
+        }
+        
+        .btn-print:hover {
+          background: #2ecc71;
+        }
+        
+        .btn-close {
+          background: #95a5a6;
+          color: white;
+        }
+        
+        .btn-close:hover {
+          background: #7f8c8d;
+        }
+        
+        .upgrade-prompt {
+          background: #fff3cd;
+          border: 1px solid #ffeaa7;
+          border-radius: 6px;
+          padding: 12px;
+          margin-bottom: 15px;
+          font-size: 14px;
+          color: #856404;
+        }
+        
+        /* Watermark - always visible but different for tiers */
+        .preview-watermark {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-45deg);
+          font-size: 72px;
+          color: rgba(102, 126, 234, 0.08);
+          font-weight: bold;
+          z-index: 500;
+          pointer-events: none;
+          font-family: 'Georgia', serif;
+          text-shadow: 0 0 10px rgba(102, 126, 234, 0.1);
+        }
+        
+        .preview-watermark-corner {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 8px 12px;
+          border-radius: 4px;
+          font-size: 11px;
+          z-index: 600;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        ${isFreeTier ? `
+        .preview-watermark-center {
+          position: fixed;
+          top: 30%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-45deg);
+          font-size: 32px;
+          color: rgba(220, 53, 69, 0.15);
+          font-weight: bold;
+          z-index: 501;
+          pointer-events: none;
+          font-family: Arial, sans-serif;
+        }
+        ` : ''}
+        
+        /* Print media styles */
+        @media print {
+          .pdf-preview-header,
+          .pdf-preview-actions {
+            display: none !important;
+          }
+          
+          body {
+            padding: 0;
+          }
+        }
+      }
+    </style>
+  `;
+
+  const previewHeader = `
+    <div class="pdf-preview-header">
+      <h1>🏰 PDF Preview - ${adventureTitle}</h1>
+      <p>This is a preview of how your PDF will look when printed</p>
+    </div>
+  `;
+
+  const previewActions = `
+    <div class="pdf-preview-actions">
+      ${!isFreeTier ? `
+        <button class="btn-professional" onclick="downloadProfessionalPDF()">
+          📄 Download Professional PDF
+          <small style="display: block; font-weight: normal;">Consumes 1 credit</small>
+        </button>
+      ` : `
+        <div class="upgrade-prompt">
+          💎 Upgrade to Creator for professional PDFs without watermarks
+        </div>
+      `}
+      
+      <button class="btn-close" onclick="window.close()">
+        ✕ Close Preview
+      </button>
+    </div>
+    
+    <script>
+      function downloadProfessionalPDF() {
+        // Get parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Call the professional PDF endpoint
+        fetch('/api/export/pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('auth_token') || localStorage.getItem('token'))
+          },
+          body: JSON.stringify({
+            template: urlParams.get('template') || 'adventure-masterpiece',
+            adventureId: urlParams.get('adventureId'),
+            title: urlParams.get('title') || '${adventureTitle}',
+            style: urlParams.get('style') || 'classic'
+          })
+        })
+        .then(response => {
+          if (response.ok) {
+            return response.blob();
+          }
+          throw new Error('Failed to generate professional PDF');
+        })
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = '${adventureTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf';
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        })
+        .catch(error => {
+          alert('Error generating PDF: ' + error.message);
+        });
+      }
+    </script>
+  `;
+
+  const watermarkHTML = `
+    <div class="preview-watermark">ARCANUM SCRIBE</div>
+    <div class="preview-watermark-corner">
+      🏰 Generated by Arcanum Scribe
+    </div>
+    ${isFreeTier ? '<div class="preview-watermark-center">PREVIEW ONLY</div>' : ''}
+  `;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>PDF Preview - ${adventureTitle}</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        ${printStyles}
+      </head>
+      <body>
+        ${previewHeader}
+        ${previewActions}
+        ${watermarkHTML}
+        <div class="pdf-content">
+          ${htmlContent}
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+// PDF Preview endpoint - generates HTML preview without consuming credits
+app.post('/api/export/pdf-preview', authenticateToken, async (req, res) => {
+  try {
+    const { template, adventureId, data, title, style } = req.body;
+    const userId = (req as any).user.id;
+    const userTier = (req as any).user.subscription_tier;
+
+    console.log(`[PDF-PREVIEW] User ${userId} (${userTier}) requesting PDF preview`);
+    console.log(`[PDF-PREVIEW] Request body:`, { template, adventureId, data: !!data, title, style });
+
+    // Validate template type
+    const validTemplates = ['adventure-masterpiece', 'full-adventure', 'monster-card', 'magic-item-card', 'spell-card', 'npc-portfolio'];
+    if (!validTemplates.includes(template)) {
+      return res.status(400).json({ error: 'Invalid template type' });
+    }
+
+    // Validate style type
+    const validStyles = ['classic', 'gothic', 'mystical', 'arcane'];
+    const selectedStyle = style && validStyles.includes(style) ? style : 'classic';
+
+    let exportData = data;
+
+    // If adventureId is provided, fetch the adventure from database
+    if (adventureId) {
+      const { rows } = await query(`
+        SELECT id, title, content, game_system, image_urls 
+        FROM adventures 
+        WHERE id = $1 AND user_id = $2
+      `, [adventureId, userId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Adventure not found' });
+      }
+
+      const adventure = rows[0];
+      exportData = {
+        ...adventure.content,
+        title: adventure.title,
+        game_system: adventure.game_system,
+        image_urls: adventure.image_urls || []
+      };
+    }
+
+    if (!exportData) {
+      return res.status(400).json({ error: 'No data provided for export' });
+    }
+
+    const adventureTitle = title || exportData.title || 'Untitled Adventure';
+    
+    // Generate HTML content using existing PDF service
+    const pdfService = new PDFService();
+    let htmlContent;
+    
+    try {
+      htmlContent = await (pdfService as any).generateHTML({
+        template: template as 'adventure-masterpiece' | 'full-adventure' | 'monster-card' | 'magic-item-card' | 'spell-card' | 'npc-portfolio',
+        data: exportData,
+        title: adventureTitle,
+        style: selectedStyle
+      });
+    } catch (htmlError) {
+      console.error('[PDF-PREVIEW] Error generating HTML:', htmlError);
+      return res.status(500).json({ error: 'Failed to prepare content for preview' });
+    }
+
+    // Add print-optimized CSS and watermark for preview
+    const previewHTML = addPrintPreviewStyles(htmlContent, adventureTitle, userTier);
+
+    // Return HTML content for preview
+    res.setHeader('Content-Type', 'text/html');
+    res.send(previewHTML);
+
+    console.log(`[PDF-PREVIEW] ✅ Preview HTML generated for ${userTier} tier`);
+
+  } catch (error) {
+    console.error('[PDF-PREVIEW] Error:', error);
+    res.status(500).json({ error: 'Failed to generate preview' });
   }
 });
 
@@ -2615,83 +3229,7 @@ async function generateImages(adventure: any, userId: string, progressTracker?: 
   return result;
 }
 
-// PDF Export endpoint
-app.post('/api/export/pdf', authenticateToken, async (req, res) => {
-  try {
-    const { template, adventureId, data, title, style } = req.body;
-    const userId = (req as any).user.id;
-
-    console.log(`[PDF-EXPORT] User ${userId} requesting ${template} export with ${style || 'classic'} theme`);
-
-    // Validate template type
-    const validTemplates = ['adventure-masterpiece', 'full-adventure', 'monster-card', 'magic-item-card', 'spell-card', 'npc-portfolio'];
-    if (!validTemplates.includes(template)) {
-      return res.status(400).json({ error: 'Invalid template type' });
-    }
-
-    // Validate style type
-    const validStyles = ['classic', 'gothic', 'mystical', 'arcane'];
-    const selectedStyle = style && validStyles.includes(style) ? style : 'classic';
-
-    let exportData = data;
-
-    // If adventureId is provided, fetch the adventure from database
-    if (adventureId) {
-      const { rows } = await query(`
-        SELECT id, title, content, game_system, image_urls 
-        FROM adventures 
-        WHERE id = $1 AND user_id = $2
-      `, [adventureId, userId]);
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'Adventure not found' });
-      }
-
-      const adventure = rows[0];
-      exportData = {
-        ...adventure.content,
-        title: adventure.title,
-        game_system: adventure.game_system,
-        image_urls: adventure.image_urls || []
-      };
-    }
-
-    if (!exportData) {
-      return res.status(400).json({ error: 'No data provided for export' });
-    }
-
-    // Initialize PDF service
-    const pdfService = new PDFService();
-    
-    // Generate PDF
-    const result = await pdfService.generatePDF({
-      template: template as 'adventure-masterpiece' | 'full-adventure' | 'monster-card' | 'magic-item-card' | 'spell-card' | 'npc-portfolio',
-      data: exportData,
-      title: title || exportData.title || 'Untitled',
-      style: selectedStyle
-    });
-
-    // Cleanup
-    await pdfService.cleanup();
-
-    // Set response headers
-    res.setHeader('Content-Type', result.contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
-    res.setHeader('Content-Length', result.buffer.length);
-
-    // Send PDF
-    res.end(result.buffer);
-
-    console.log(`[PDF-EXPORT] Successfully generated ${result.filename}`);
-
-  } catch (error) {
-    console.error('[PDF-EXPORT] ERROR:', error);
-    res.status(500).json({ 
-      error: 'PDF generation failed', 
-      details: error.message 
-    });
-  }
-});
+// Removed duplicate PDF export endpoint - functionality merged into first endpoint above
 
 // Test adventure generation endpoint
 app.post('/api/test/generate-adventure', async (req, res) => {
@@ -3612,8 +4150,14 @@ IMPORTANT: Respond ONLY with valid JSON in the required structure. Do not includ
     return adventureData;
     
   } catch (error) {
-    console.error('[ADVENTURE-GEN] Error:', error);
-    throw error;
+    console.error('[ADVENTURE-GEN] CRITICAL ERROR:', error);
+    
+    // CRITICAL FIX: Notify progress tracker of error
+    if (progressTracker) {
+      progressTracker.error(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    throw new Error(`Adventure generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

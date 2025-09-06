@@ -5,7 +5,7 @@ import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import { query } from '../src/integrations/postgres/client';
 
-// Esquema compacto para aventuras (reducir tamaño de respuesta)
+// ENHANCED ADVENTURE SCHEMA - Matches frontend expectations
 const AdventureSchema = z.object({
   title: z.string(),
   gameSystem: z.string(),
@@ -13,6 +13,8 @@ const AdventureSchema = z.object({
   partySize: z.string(),
   estimatedDuration: z.string(),
   summary: z.string(),
+  backgroundStory: z.string(),
+  plotHooks: z.array(z.string()).max(5), // Array of hook strings
   adventureHooks: z.array(z.object({
     hookType: z.string(),
     description: z.string(),
@@ -20,26 +22,36 @@ const AdventureSchema = z.object({
   })).max(3), // Limitar a 3 hooks
   scenes: z.array(z.object({
     title: z.string(),
-    objectives: z.array(z.string()).max(3), // Máximo 3 objetivos
+    description: z.string(), // Frontend expects this
+    objectives: z.array(z.string()).max(3),
+    challenges: z.string(), // Frontend expects this
     readAloudText: z.string(),
-    keyElements: z.array(z.string()).max(4), // Máximo 4 elementos
+    keyElements: z.array(z.string()).max(4),
     encounters: z.array(z.object({
       name: z.string(),
       type: z.string(),
       difficulty: z.string(),
       mechanics: z.string(),
       creatures: z.string()
-    })).max(2), // Máximo 2 encuentros por escena
+    })).max(2),
     skillChallenges: z.array(z.object({
       description: z.string(),
       dc: z.number(),
       skills: z.string(),
       success: z.string(),
       failure: z.string()
-    })).max(2), // Máximo 2 desafíos por escena
+    })).max(2),
     transitions: z.string(),
     troubleshooting: z.string()
   })).max(4), // Máximo 4 escenas
+  npcs: z.array(z.object({
+    name: z.string(),
+    role: z.string(),
+    personality: z.string(),
+    motivation: z.string(),
+    appearance: z.string().optional(),
+    background: z.string().optional()
+  })).max(6),
   monsters: z.array(z.object({
     name: z.string(),
     role: z.string(),
@@ -76,7 +88,20 @@ const AdventureSchema = z.object({
       description: z.string()
     })).max(3), // Máximo 3 acciones
     legendaryActions: z.string().optional()
-  })).max(3) // Máximo 3 monstruos
+  })).max(3), // Máximo 3 monstruos
+  magicItems: z.array(z.object({
+    name: z.string(),
+    description: z.string(),
+    rarity: z.string(),
+    properties: z.string(),
+    attunement: z.string().optional(),
+    charges: z.string().optional()
+  })).max(5),
+  rewards: z.object({
+    experience: z.string(),
+    treasure: z.string(),
+    other: z.string()
+  })
 });
 
 interface LLMProvider {
@@ -410,9 +435,17 @@ export class LLMServiceV2 {
         const result = await generateObject({
           model: modelInstance,
           schema: AdventureSchema,
-          prompt: `${systemPrompt}\n\nUser request: ${prompt}\n\nGenerate a complete, high-quality TTRPG adventure following the schema exactly. Keep descriptions concise but engaging. Limit to 4 scenes, 3 monsters, and essential content only.`,
+          prompt: `${systemPrompt}\n\nUser request: ${prompt}\n\nGenerate a COMPLETE adventure following the schema exactly. Include:
+- Engaging background story and plot hooks
+- 3-4 detailed scenes with descriptions, objectives, and challenges  
+- 3-6 NPCs with personality and motivation
+- 2-3 monsters with full stat blocks
+- 2-5 magic items appropriate to the adventure
+- Experience, treasure, and other rewards
+
+Make descriptions rich but concise. Ensure all required fields are populated.`,
           temperature: Number(model.temperature) || 0.7,
-          maxTokens: 6000, // Reducir tokens para respuestas más compactas
+          maxTokens: 10000, // Increased for richer content
         });
 
         console.log(`✅ Success with ${model.display_name} using generateObject`);

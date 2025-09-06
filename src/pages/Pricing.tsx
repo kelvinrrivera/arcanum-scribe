@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { Navigation } from '@/components/landing/Navigation';
+import { Footer } from '@/components/landing/Footer';
+import { SEOHead, SEO_CONFIGS } from '@/components/seo/SEOHead';
+import { STRUCTURED_DATA } from '@/lib/structured-data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +21,8 @@ const plans = [
     features: [
       'Unlimited access to Public Legend Library',
       '3 PDF downloads per month',
-      'Rate and review adventures',
-      'Bookmark favorite content',
+      'Rate and review adventures (Coming Soon)',
+      'Bookmark favorite content (Coming Soon)',
       'Search and filter adventures'
     ],
     limitations: [
@@ -32,7 +36,7 @@ const plans = [
   },
   {
     name: 'The Creator',
-    price: '€12',
+    price: 'Coming Soon',
     period: 'per month',
     description: 'Forge your own legends and share them with the world',
     icon: '⚒️',
@@ -43,17 +47,17 @@ const plans = [
       'Generate full adventures (3 ✨) and components (1 ✨)',
       'Unlimited downloads, watermark-free',
       'Public sharing by default',
-      'Creator analytics and recognition',
-      'Option to purchase additional credits'
+      'Creator analytics (Coming Soon)',
+      'Additional credits purchase (Coming Soon)'
     ],
     limitations: [],
-    buttonText: 'Start Creating',
+    buttonText: 'Join Beta Waitlist',
     buttonVariant: 'default' as const,
     popular: true
   },
   {
     name: 'The Architect',
-    price: '€29',
+    price: 'Coming Soon',
     period: 'per month',
     description: 'Design your worlds in secret with master tools',
     icon: '🏛️',
@@ -62,14 +66,14 @@ const plans = [
     features: [
       '30 Magic Credits ✨ per month',
       'Private creations by default',
-      'Access to Adventure Forge (node builder)',
-      'Advanced stat blocks for multiple systems',
-      'Priority generation queue',
+      'Adventure Forge (Coming Soon)',
+      'Multiple game systems (Coming Soon)',
+      'Priority generation queue (Coming Soon)',
       'Professional PDF templates',
-      'Advanced export formats (Roll20, FoundryVTT)'
+      'VTT export formats (Coming Soon)'
     ],
     limitations: [],
-    buttonText: 'Start Architecting',
+    buttonText: 'Join Beta Waitlist',
     buttonVariant: 'default' as const,
     popular: false
   }
@@ -79,11 +83,22 @@ export default function Pricing() {
   const { user, profile } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <main className="container mx-auto px-4 py-8">
+    <div className="min-h-screen">
+      <Navigation />
+      <SEOHead
+        {...SEO_CONFIGS.pricing}
+        structuredData={STRUCTURED_DATA.pricing()}
+      />
+      <div className="bg-gradient-to-br from-background via-background to-primary/5">
+      <main className="container mx-auto px-4 py-8 pt-32">
         <div className="max-w-6xl mx-auto space-y-12">
           {/* Header */}
           <div className="text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Beta Development</span>
+            </div>
+            
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               ✨ The Magic Credits Economy
             </h1>
@@ -91,6 +106,14 @@ export default function Pricing() {
               Choose your creative power level. Every creation costs Magic Credits ✨ - 
               a transparent, flexible system that grows with your needs.
             </p>
+            
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 max-w-2xl mx-auto">
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-primary">Beta Notice:</strong> We're currently in closed beta development. 
+                Pricing and subscription plans will be available when we launch publicly. 
+                Join our beta waitlist to be notified when these tiers become available!
+              </p>
+            </div>
             
             {user && profile && (
               <div className="flex items-center justify-center space-x-4">
@@ -394,6 +417,8 @@ export default function Pricing() {
           </div>
         </div>
       </main>
+      </div>
+      <Footer />
     </div>
   );
 } 

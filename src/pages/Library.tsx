@@ -444,27 +444,87 @@ export default function Library() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAdventures.map((adventure) => (
-              <Card key={adventure.id} className="group hover:shadow-lg transition-all duration-300">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg line-clamp-2 mb-1">
-                        {adventure.title}
-                      </CardTitle>
-                      <CardDescription className="line-clamp-2">
+            {filteredAdventures.map((adventure) => {
+              // Extract the main image from adventure content
+              const getAdventureImage = () => {
+                if (adventure.content?.images && adventure.content.images.length > 0) {
+                  return adventure.content.images[0].url;
+                }
+                if (adventure.content?.monsters && adventure.content.monsters.length > 0) {
+                  const monster = adventure.content.monsters[0];
+                  if (monster.image_url) return monster.image_url;
+                }
+                if (adventure.content?.npcs && adventure.content.npcs.length > 0) {
+                  const npc = adventure.content.npcs[0];
+                  if (npc.image_url) return npc.image_url;
+                }
+                return null;
+              };
+
+              const mainImage = getAdventureImage();
+
+              return (
+                <Card key={adventure.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
+                  {/* Adventure Image */}
+                  {mainImage && (
+                    <div className="relative h-48 overflow-hidden">
+                      <img
+                        src={mainImage}
+                        alt={adventure.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          // Hide image if it fails to load
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute top-3 right-3">
+                        {adventure.privacy === 'public' ? (
+                          <Badge className="bg-green-600/90 text-white border-0">
+                            <Globe className="h-3 w-3 mr-1" />
+                            Public
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-blue-600/90 text-white border-0">
+                            <Lock className="h-3 w-3 mr-1" />
+                            Private
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="absolute bottom-3 left-3 right-3">
+                        <h3 className="text-white font-bold text-lg line-clamp-2 drop-shadow-lg">
+                          {adventure.title}
+                        </h3>
+                      </div>
+                    </div>
+                  )}
+
+                  <CardHeader className={mainImage ? "pb-2" : ""}>
+                    {!mainImage && (
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg line-clamp-2 mb-1">
+                            {adventure.title}
+                          </CardTitle>
+                          <CardDescription className="line-clamp-2">
+                            {adventure.description || 'No description available'}
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2">
+                          {adventure.privacy === 'public' ? (
+                            <Globe className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Lock className="h-4 w-4 text-blue-600" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {mainImage && (
+                      <CardDescription className="line-clamp-2 mt-2">
                         {adventure.description || 'No description available'}
                       </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      {adventure.privacy === 'public' ? (
-                        <Globe className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Lock className="h-4 w-4 text-blue-600" />
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
+                    )}
+                  </CardHeader>
 
                 <CardContent className="space-y-4">
                   {/* Metadata */}
@@ -549,7 +609,8 @@ export default function Library() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

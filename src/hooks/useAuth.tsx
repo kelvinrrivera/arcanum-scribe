@@ -46,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData = await api.getUserProfile();
       setUser(userData);
     } catch (error) {
+      console.log('Failed to load user, clearing token:', error);
       localStorage.removeItem('auth_token');
       setUser(null);
     } finally {

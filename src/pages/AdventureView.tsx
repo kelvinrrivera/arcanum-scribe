@@ -288,6 +288,116 @@ export default function AdventureView() {
     }
   };
 
+  const handlePreviewPDF = async (template: 'adventure-masterpiece' | 'full-adventure' | 'monster-card' | 'magic-item-card' | 'spell-card' | 'npc-portfolio', data?: any, title?: string, style?: 'classic' | 'gothic' | 'mystical' | 'arcane') => {
+    if (!adventure) return;
+
+    try {
+      const loadingMessage = template === 'adventure-masterpiece' 
+        ? `🔍 Preparing ${style || 'classic'} preview...` 
+        : template === 'full-adventure' 
+        ? 'Preparing full adventure preview...' 
+        : template === 'monster-card' 
+        ? 'Preparing monster card preview...'
+        : template === 'magic-item-card'
+        ? 'Preparing magic item card preview...'
+        : template === 'spell-card'
+        ? 'Preparing spell card preview...'
+        : 'Preparing NPC portfolio preview...';
+      
+      toast.loading(loadingMessage);
+      
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const requestBody: any = {
+        template,
+        title: title || adventure.title,
+        style: style || 'classic'
+      };
+
+      // Add professional mode information for enhanced PDF formatting
+      if (professionalEnhancement) {
+        requestBody.professionalMode = true;
+        requestBody.professionalGrade = professionalEnhancement.professionalGrade;
+        requestBody.qualityMetrics = professionalEnhancement.qualityMetrics;
+        requestBody.professionalFeatures = {
+          multiSolutionPuzzles: true,
+          enhancedNPCs: true,
+          tacticalCombat: true,
+          gmTools: true,
+          structuredChallenges: true
+        };
+      }
+
+      if (template === 'adventure-masterpiece' || template === 'full-adventure') {
+        requestBody.adventureId = adventure.id;
+      } else {
+        requestBody.data = data;
+      }
+
+      console.log('[PDF-PREVIEW] Requesting preview:', requestBody);
+
+      const response = await fetch('/api/export/pdf-preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      toast.dismiss();
+
+      if (!response.ok) {
+        let errorMessage = `PDF preview failed: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If not JSON, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Get HTML response and open in new window
+      const htmlContent = await response.text();
+      
+      // Create new window with preview
+      const previewWindow = window.open('', '_blank');
+      if (previewWindow) {
+        previewWindow.document.write(htmlContent);
+        previewWindow.document.close();
+        
+        // Pass parameters through URL for the professional PDF download
+        const params = new URLSearchParams({
+          template: template,
+          adventureId: adventure.id,
+          title: title || adventure.title,
+          style: style || 'classic'
+        });
+        
+        // Update the URL to include parameters
+        previewWindow.history.replaceState(null, '', '?' + params.toString());
+        
+        toast.success('📖 Preview generated');
+      } else {
+        toast.error('Error: Could not open preview window. Please allow popups for this site.');
+      }
+
+      // Track preview event
+      if (adventure) {
+        trackAdventureExported(adventure.id, template + '-preview');
+      }
+    } catch (error: any) {
+      console.error('Preview error:', error);
+      toast.error(error.message || 'Failed to generate preview');
+    }
+  };
+
   const handleExport = async (template: 'adventure-masterpiece' | 'full-adventure' | 'monster-card' | 'magic-item-card' | 'spell-card' | 'npc-portfolio', data?: any, title?: string, style?: 'classic' | 'gothic' | 'mystical' | 'arcane') => {
     if (!adventure) return;
 
@@ -545,6 +655,65 @@ export default function AdventureView() {
                   </Tooltip>
                 </TooltipProvider>
               )}
+              
+              {/* PDF Preview - independent button */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-2 hover:bg-blue-50 border-blue-200 hover:border-blue-400">
+                    <Eye className="h-4 w-4" />
+                    Preview
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="text-center font-display text-blue-600">
+                    🔍 PDF Preview (Free)
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {/* Preview Options */}
+                  <DropdownMenuItem 
+                    onClick={() => handlePreviewPDF('adventure-masterpiece', undefined, undefined, 'classic')}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-amber-50"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center">
+                      <Crown className="h-3 w-3 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">Classic Masterpiece</div>
+                      <div className="text-xs text-muted-foreground">Elegant preview</div>
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => handlePreviewPDF('adventure-masterpiece', undefined, undefined, 'gothic')}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-slate-50"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center">
+                      <Skull className="h-3 w-3 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">Gothic Darkness</div>
+                      <div className="text-xs text-muted-foreground">Dark preview</div>
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => handlePreviewPDF('adventure-masterpiece', undefined, undefined, 'mystical')}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-purple-50"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center">
+                      <Star className="h-3 w-3 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">Mystical Wonder</div>
+                      <div className="text-xs text-muted-foreground">Mystical preview</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Professional PDF Export */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" className="btn-primary-gradient">

@@ -11,8 +11,7 @@ import { toast } from 'sonner';
 import { AdventureWizard } from '@/components/adventure-wizard/AdventureWizard';
 import { TierUsageIndicator } from '@/components/tier';
 import { CreditPurchaseModal } from '@/components/tier/CreditPurchaseModal';
-import { AdventureProgress } from '@/components/AdventureProgress';
-import { useAdventureProgress } from '@/hooks/useAdventureProgress';
+// WebSocket progress removed - using simple themed progress instead
 import { ContentTypeSelector, ContentType } from '@/components/generation/ContentTypeSelector';
 import { MonsterGenerator } from '@/components/generation/MonsterGenerator';
 import { NPCGenerator } from '@/components/generation/NPCGenerator';
@@ -33,7 +32,7 @@ export default function Generate() {
   const { user, isLoading } = useAuth();
   const { trackAdventureGenerated } = useAnalytics();
   const navigate = useNavigate();
-  const { progress: adventureProgress, startProgress, clearProgress } = useAdventureProgress(user?.id || null);
+  // WebSocket progress removed - using simple themed progress instead
 
   // ALL useState hooks
   const [gameSystem, setGameSystem] = useState('dnd5e');
@@ -118,31 +117,36 @@ export default function Generate() {
     }
 
     setIsGenerating(true);
-    setProgress(0);
-    startProgress(); // Start the WebSocket progress tracking
     setShowWizard(false);
 
+    // Start elegant themed progress system
+    setProgress(0);
+    setCurrentStep('🎲 Invocando las fuerzas creativas...');
+    
+    const progressSteps = [
+      { progress: 5, message: '🎲 Invocando las fuerzas creativas...' },
+      { progress: 15, message: '🧙‍♂️ Consultando el Oráculo Arcano...' },
+      { progress: 25, message: '📜 Forjando la leyenda principal...' },
+      { progress: 40, message: '🏰 Construyendo ubicaciones épicas...' },
+      { progress: 55, message: '👥 Dando vida a personajes memorables...' },
+      { progress: 70, message: '🐉 Despertando criaturas legendarias...' },
+      { progress: 80, message: '🎨 Invocando artistas espectrales...' },
+      { progress: 90, message: '✨ Aplicando encantos magistrales...' },
+      { progress: 100, message: '🎉 ¡Tu aventura épica está lista!' }
+    ];
+
+    // Simulate realistic progress with beautiful themed messages
+    let currentStepIndex = 0;
+    const progressInterval = setInterval(() => {
+      if (currentStepIndex < progressSteps.length - 1) {
+        currentStepIndex++;
+        const step = progressSteps[currentStepIndex];
+        setProgress(step.progress);
+        setCurrentStep(step.message);
+      }
+    }, 2000 + Math.random() * 3000); // Random intervals 2-5 seconds for realism
+
     try {
-      const steps = [
-        'Initializing professional generation...',
-        'Analyzing prompt with advanced AI...',
-        'Generating complex puzzles...',
-        'Creating detailed NPCs...',
-        'Designing tactical encounters...',
-        'Applying professional layout...',
-        'Finalizing enhanced adventure...',
-      ];
-
-      setCurrentStep(steps[0]);
-
-      let stepIndex = 0;
-      const progressInterval = setInterval(() => {
-        if (stepIndex < steps.length) {
-          setCurrentStep(steps[stepIndex]);
-          setProgress((stepIndex + 1) * (80 / steps.length));
-          stepIndex++;
-        }
-      }, 1500);
 
       const token = localStorage.getItem('auth_token');
       if (!token) {
@@ -174,14 +178,21 @@ export default function Generate() {
         }
       };
 
+      // CRITICAL FIX: Add timeout to prevent infinite hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+      
       const response = await fetch('/api/generate-adventure', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -194,17 +205,19 @@ export default function Generate() {
         console.log('Professional quality adventure generated successfully');
       }
 
-      clearInterval(progressInterval);
+      // Progress interval already removed
 
       if (!result) {
         throw new Error('No adventure data received');
       }
 
+      // Complete progress and clean up
+      clearInterval(progressInterval);
       setProgress(100);
-      setCurrentStep('Professional adventure complete!');
+      setCurrentStep('🎉 ¡Tu aventura épica está lista!');
 
       trackAdventureGenerated(selectedGameSystem, prompt.length);
-      toast.success('Professional Adventure Created!');
+      toast.success('¡Aventura Profesional Creada!');
 
       setTimeout(() => {
         let adventureId = result.originalAdventure?.id || result.adventure?.id || result.id || result._id;
@@ -233,10 +246,15 @@ export default function Generate() {
       }, 500);
 
     } catch (error: any) {
+      // Clean up progress on error
+      clearInterval(progressInterval);
       setProgress(0);
       setCurrentStep('');
       
-      if (error.message?.includes('Insufficient credits')) {
+      // CRITICAL FIX: Handle different error types including timeouts
+      if (error.name === 'AbortError') {
+        toast.error('Generation timed out. Please try again with a shorter prompt.');
+      } else if (error.message?.includes('Insufficient credits')) {
         toast.error('Insufficient credits. Please upgrade your plan.');
       } else if (error.message?.includes('rate limit')) {
         toast.error('Too many requests. Please wait a moment and try again.');
@@ -245,7 +263,6 @@ export default function Generate() {
       }
     } finally {
       setIsGenerating(false);
-      clearProgress(); // Clear progress when done (success or error)
     }
   };
 
@@ -601,10 +618,7 @@ export default function Generate() {
         isLoading={creditPurchaseLoading}
       />
 
-      <AdventureProgress
-        progress={adventureProgress}
-        isVisible={isGenerating && !!adventureProgress}
-      />
+      {/* WebSocket progress removed - using simple themed progress instead */}
     </div>
   );
 }

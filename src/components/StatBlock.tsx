@@ -165,27 +165,33 @@ const StatBlock: React.FC<StatBlockProps> = ({ monster, className = '' }) => {
               {/* Additional Info */}
               {(monster.skills || monster.senses || monster.languages) && (
                 <div className="bg-muted/20 rounded-lg p-4 border border-border space-y-2 text-sm">
-                  {monster.skills && monster.skills.length > 0 && (
+                  {monster.skills && (
                     <div>
                       <span className="font-sans font-semibold text-foreground">Skills:</span>
-                      <span className="ml-2 text-muted-foreground">{monster.skills.join(', ')}</span>
+                      <span className="ml-2 text-muted-foreground">
+                        {Array.isArray(monster.skills) ? monster.skills.join(', ') : monster.skills}
+                      </span>
                     </div>
                   )}
-                  {monster.senses && monster.senses.length > 0 && (
+                  {monster.senses && (
                     <div className="flex items-start gap-2">
                       <Eye className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
                       <div>
                         <span className="font-sans font-semibold text-foreground">Senses:</span>
-                        <span className="ml-2 text-muted-foreground">{monster.senses.join(', ')}</span>
+                        <span className="ml-2 text-muted-foreground">
+                          {Array.isArray(monster.senses) ? monster.senses.join(', ') : monster.senses}
+                        </span>
                       </div>
                     </div>
                   )}
-                  {monster.languages && monster.languages.length > 0 && (
+                  {monster.languages && (
                     <div className="flex items-start gap-2">
                       <MessageCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <div>
                         <span className="font-sans font-semibold text-foreground">Languages:</span>
-                        <span className="ml-2 text-muted-foreground">{monster.languages.join(', ')}</span>
+                        <span className="ml-2 text-muted-foreground">
+                          {Array.isArray(monster.languages) ? monster.languages.join(', ') : monster.languages}
+                        </span>
                       </div>
                     </div>
                   )}

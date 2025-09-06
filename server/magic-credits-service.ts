@@ -20,6 +20,7 @@ export interface CreditCosts {
   magicItem: number;
   puzzle: number;
   regenerateSection: number;
+  pdfExport: number; // Professional PDF export
 }
 
 export interface UserCredits {
@@ -57,6 +58,7 @@ export class MagicCreditsService {
       magicItem: 1,
       puzzle: 1,
       regenerateSection: 1,
+      pdfExport: 1, // Professional PDF costs 1 credit
     };
     this.initializeTierConfigs();
   }

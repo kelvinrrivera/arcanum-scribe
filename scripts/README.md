@@ -1,125 +1,44 @@
-# 🛠️ Scripts Directory
+# Scripts Directory
 
-This directory contains essential scripts for **Arcanum Scribe** project management, database operations, and development workflows.
+This directory contains essential scripts for the Arcanum Scribe project.
 
-## 📋 Available Scripts
+## Essential Scripts
 
-### 🗄️ **Database Management**
+### Database Management
+- `init-database.ts` - Initialize the database with required tables
+- `init-admin-tables.ts` - Set up admin-specific tables
+- `run-migrations.ts` - Run database migrations
+- `setup-llm-models.sql` - SQL script for LLM models setup
+- `align_llm_providers.sql` - Align LLM providers in database
+
+### Development
+- `start-dev.ts` - Start development server
+- `setup-project.sh` - Project setup script
+
+### Database Schema
+- `add-image-columns.sql` - Add image-related columns to database
+
+## Archive Directory
+
+The `archive/` directory contains:
+- **`temp-scripts/`** - Temporary development and debugging scripts
+- **Legacy scripts** - Older versions and experimental code
+
+These archived scripts are kept for reference but are not part of the active codebase.
+
+## Usage
+
 ```bash
-# Create database tables
-npm run create-tables
+# Initialize database
+npm run db:init
 
-# Apply migrations
-npm run apply-migrations
+# Start development
+npm run dev
 
 # Run migrations
-npm run run-migrations
-
-# Seed database with test data
-npm run seed              # Full seeding
-npm run seed:demo         # Simple demo seeding
+npm run migrate
 ```
 
-### 👤 **Admin Management**
-```bash
-# Create admin user
-npm run make-admin
-```
+## Note
 
-### 🤖 **OpenRouter Configuration**
-```bash
-# Setup OpenRouter integration
-npm run setup:openrouter
-
-# Test OpenRouter functionality
-npm run test:openrouter
-npm run test:openrouter-simple
-npm run test:openrouter-postgres
-```
-
-### 🚀 **Development**
-```bash
-# Start full development environment
-npm run dev:full
-```
-
-## 📁 **Script Categories**
-
-### 🗄️ **Database Scripts**
-- `apply-migrations.ts` - Apply database migrations
-- `create-tables.ts` - Create necessary database tables
-- `run-migrations.ts` - Run database migrations
-- `add-image-columns.ts` - Add image columns to tables
-- `create-admin-profile.sql` - SQL for admin profile creation
-
-### 🌱 **Seeding Scripts**
-- `seed.ts` - Full database seeding with realistic data
-- `seed-simple.ts` - Simple demo seeding
-- `seed-env.ts` - Environment-based seeding configuration
-
-### 👤 **Admin Scripts**
-- `create-admin-user.ts` - Create admin user
-- `create-or-check-admin.ts` - Create or verify admin user
-- `test-admin-curl.sh` - Test admin endpoints with curl
-
-### 🤖 **OpenRouter Scripts**
-- `setup-openrouter-postgres.ts` - Setup OpenRouter with PostgreSQL
-- `test-openrouter.ts` - Test OpenRouter functionality
-- `test-openrouter-simple.ts` - Simple OpenRouter test
-- `test-openrouter-postgres.ts` - Test OpenRouter with PostgreSQL
-
-### 🚀 **Development Scripts**
-- `start-dev.ts` - Start development environment
-
-## 🔧 **Environment Setup**
-
-Ensure your `.env` file contains:
-```env
-# Database
-DATABASE_URL=postgresql://username:password@localhost:5432/arcanum_scribe
-
-# OpenRouter
-OPENROUTER_API_KEY=sk-or-your-key-here
-
-# Optional: Seeding configuration
-USERS_COUNT=50
-ADVENTURES_COUNT=150
-INVITE_CODES_COUNT=20
-```
-
-## 🚀 **Quick Start**
-
-1. **Setup database**:
-   ```bash
-   npm run create-tables
-   npm run apply-migrations
-   ```
-
-2. **Seed with demo data**:
-   ```bash
-   npm run seed:demo
-   ```
-
-3. **Create admin user**:
-   ```bash
-   npm run make-admin
-   ```
-
-4. **Setup OpenRouter**:
-   ```bash
-   npm run setup:openrouter
-   npm run test:openrouter
-   ```
-
-5. **Start development**:
-   ```bash
-   npm run dev:full
-   ```
-
-## 📊 **Script Status**
-
-✅ **Essential Scripts Only** - All temporary test files removed  
-✅ **Clean Architecture** - Organized by functionality  
-✅ **Professional Structure** - Ready for production use  
-
-**Total Scripts: 18** (down from 69+ temporary files) 
+Only essential scripts are kept in the root of this directory. All temporary, debugging, and development-specific scripts have been moved to the `archive/` directory to maintain a clean and professional codebase.

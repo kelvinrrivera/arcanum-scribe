@@ -19,11 +19,8 @@ export const useAdventureProgress = (userId: string | null) => {
   useEffect(() => {
     if (!userId) return;
 
-    // Initialize socket connection
-    const socket = io(process.env.NODE_ENV === 'production' 
-      ? 'https://your-domain.com' 
-      : 'http://localhost:3000'
-    );
+    // CRITICAL FIX: Correct WebSocket connection URL
+    const socket = io(window.location.origin);
 
     socketRef.current = socket;
 

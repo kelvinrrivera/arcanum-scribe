@@ -40,7 +40,7 @@ const NotFound = () => {
                     Go Home
                   </Link>
                 </Button>
-                <Button asChild variant="outline" onClick={() => window.history.back()}>
+                <Button variant="outline" onClick={() => window.history.back()}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Go Back
                 </Button>
